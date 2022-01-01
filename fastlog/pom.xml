@@ -80,6 +80,18 @@
             <version>2.6.0</version>
         </dependency>
 
+        <dependency>
+            <groupId>io.appulse</groupId>
+            <artifactId>utils-java</artifactId>
+            <version>1.15.0</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
     </dependencies>
 
 

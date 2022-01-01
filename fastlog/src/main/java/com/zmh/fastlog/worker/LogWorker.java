@@ -24,7 +24,6 @@ import static com.zmh.fastlog.utils.ThreadUtils.namedDaemonThreadFactory;
 import static com.zmh.fastlog.utils.Utils.debugLog;
 import static com.zmh.fastlog.utils.Utils.getNowTime;
 import static com.zmh.fastlog.worker.LogWorker.Consts.*;
-import static java.lang.System.currentTimeMillis;
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -34,8 +33,8 @@ import static org.apache.commons.lang3.StringUtils.startsWithAny;
  * @author zmh
  */
 public class LogWorker implements Worker<Object>,
-    EventHandler<LogEvent>,
-    SequenceReportingEventHandler<LogEvent>,
+    EventHandler<LogWorker.LogEvent>,
+    SequenceReportingEventHandler<LogWorker.LogEvent>,
     BatchStartAware {
 
     // 日志有两个可能方向, 一个往pulsar, 一个写本地文件缓存
@@ -54,7 +53,8 @@ public class LogWorker implements Worker<Object>,
 
     // 统计丢弃的日志数
     private long totalMissingCount = 0;
-    private final LongAdder missingCount = new LongAdder();
+    private final LongAdder missingCount1 = new LongAdder();
+    private final LongAdder missingCount2 = new LongAdder();
     private final ScheduledFuture<?> missingSchedule = scheduleAtFixedRate(this::reportMissCount, 1, 5, SECONDS);
 
 
@@ -65,10 +65,10 @@ public class LogWorker implements Worker<Object>,
     // mq堵塞的时候切到file缓存
     private boolean directWriteToPulsar = false;
     private final Worker<Object> pulsarWorker;
-    private final Worker<Object> fileQueueWorker;
+    private final Worker<LogEvent> fileQueueWorker;
 
 
-    public LogWorker(Worker<Object> pulsarWorker, Worker<Object> fileQueueWorker, int batchSize, Map<String, String> additionalFields) {
+    public LogWorker(Worker<Object> pulsarWorker, Worker<LogEvent> fileQueueWorker, int batchSize, Map<String, String> additionalFields) {
         this.pulsarWorker = pulsarWorker;
         this.fileQueueWorker = fileQueueWorker;
         this.additionalFields = additionalFields;
@@ -91,6 +91,12 @@ public class LogWorker implements Worker<Object>,
         queue.start();
     }
 
+    /**
+     * log ring buffer 生产者
+     *
+     * @param message 入参有两种类型，1、正常日志 ILoggingEvent  2、mq发过来的已消费序号 LastSeq
+     * @return true 日志发送成功 false 日志发送失败
+     */
     @SuppressWarnings("CodeBlock2Expr")
     @Override
     public boolean sendMessage(Object message) {
@@ -102,16 +108,21 @@ public class LogWorker implements Worker<Object>,
             if (!ringBuffer.tryPublishEvent((event, sequence) -> {
                 convertToByteMessage(msg, event.getByteBuilder());
             })) {
-                missingCount.increment();
+                missingCount1.increment();
                 return false;
             } else {
                 return true;
             }
-        } else {
-            return ringBuffer.tryPublishEvent((event, sequence) -> {
-                event.setLog(message);
-            });
+        } else if (message instanceof LastSeq) {
+            long lastSeq = ((LastSeq) message).getSeq();
+            // 本地文件缓冲区已经发完了, 后续日志切换到mq
+            if (lastSeq == lastMessageId && !directWriteToPulsar) {
+                directWriteToPulsar = true;
+                debugLog("本地cache已经清空,切换到mq," + getNowTime());
+            }
+            return true;
         }
+        return false;
     }
 
     private boolean isExclude(ILoggingEvent message) {
@@ -137,37 +148,14 @@ public class LogWorker implements Worker<Object>,
     // 日志id, 发送成功一条加1,
     // 初始值 [ currentMillSeconds, 0 ]
     //       [  41bit,    12bit       ]
-    private long lastMessageId = currentTimeMillis() << 12;
+    //private long lastMessageId = currentTimeMillis() << 12;
+    private long lastMessageId = 0;
 
     public void onEvent(LogEvent event, long sequence, boolean endOfBatch) {
-        Object eventLog = event.getLog();
-        boolean success = false;
-        // Seq类型的消息
-        if (eventLog instanceof LastSeq) {
-            long lastSeq = ((LastSeq) eventLog).getSeq();
-            // 本地文件缓冲区已经发完了, 后续日志切换到mq
-            if (lastSeq == lastMessageId && !directWriteToPulsar) {
-                directWriteToPulsar = true;
-                debugLog("本地cache已经清空,切换到mq," + getNowTime());
-            }
-            while (!(success = fileQueueWorker.sendMessage(eventLog))
-                && (ringBuffer.getCursor() - sequence < highWaterLevelFile) // 缓冲区比较从容的话可以多等些时间, 尽可能把消息发送出去
-            ) {
-                if (isClosed) {
-                    break;
-                }
-                ThreadUtils.sleep(5);
-            }
-            if (!success) {
-                missingCount.increment();
-            }
-            event.clear();
-            return;
-        }
-
-        // 普通的日志
         long messageId = lastMessageId + 1;
         event.setId(messageId);
+
+        boolean success = false;
 
         if (directWriteToPulsar) {
             while (!(success = pulsarWorker.sendMessage(event))) {
@@ -177,7 +165,7 @@ public class LogWorker implements Worker<Object>,
                 if (ringBuffer.getCursor() - sequence >= highWaterLevelPulsar) {
                     break;
                 }
-                ThreadUtils.sleep(5);
+                ThreadUtils.sleep(1);
             }
             // 写入失败, 切换到本地文件缓冲区
             if (!success && directWriteToPulsar) {
@@ -191,27 +179,27 @@ public class LogWorker implements Worker<Object>,
                 if (isClosed) {
                     break;
                 }
-                if (ringBuffer.getCursor() - sequence >= highWaterLevelFile) {
+                if (ringBuffer.getCursor() - sequence >= highWaterLevelPulsar) {
                     break;
                 }
-                ThreadUtils.sleep(5);
-            }
-            if (!success) {
-                missingCount.increment();
+                ThreadUtils.sleep(1);
             }
         }
+
         if (success) {
             lastMessageId = messageId;
+        } else {
+            missingCount2.increment();
         }
+
         notifySeq(sequence);
         event.clear();
     }
 
-
     private final static DateSequence dataSeq = new DateSequence();
-    private final FastDateFormat dateFormat = FastDateFormat.getInstance("yyyy-MM-dd'T'HH:mm:ss.SSSZZ");
+    private final FastDateFormat dateFormat = FastDateFormat.getInstance("yyyy-MM-dd HH:mm:ss.SSS");
 
-    private void convertToByteMessage(ILoggingEvent log, JsonByteBuilder jsonByteBuilder) {
+    void convertToByteMessage(ILoggingEvent log, JsonByteBuilder jsonByteBuilder) {
         jsonByteBuilder.clear()
             .beginObject()
             .key(DATA_SEQ).value(dataSeq.next())
@@ -255,10 +243,16 @@ public class LogWorker implements Worker<Object>,
     }
 
     private void reportMissCount() {
-        long sum = missingCount.sumThenReset();
-        if (sum > 0) {
-            totalMissingCount += sum;
-            debugLog("log mission count:" + sum + ", total:" + totalMissingCount);
+        long sum1 = missingCount1.sumThenReset();
+        if (sum1 > 0) {
+            totalMissingCount += sum1;
+            debugLog("log mission count1:" + sum1 + ", total:" + totalMissingCount);
+        }
+
+        long sum2 = missingCount2.sumThenReset();
+        if (sum2 > 0) {
+            totalMissingCount += sum2;
+            debugLog("log mission count2:" + sum2 + ", total:" + totalMissingCount);
         }
     }
 
@@ -305,46 +299,44 @@ public class LogWorker implements Worker<Object>,
         static final String DATA_TIMESTAMP = "@timestamp";
     }
 
+    @Data
+    @EqualsAndHashCode(callSuper = true)
+    @ToString(callSuper = true)
+    public static class LogEvent extends ByteMessage {
+        private JsonByteBuilder byteBuilder = JsonByteBuilder.create(2 * 1024);
+        private WeakReference<JsonByteBuilder> cache = new WeakReference<>(byteBuilder);
 
-}
-
-@Data
-@EqualsAndHashCode(callSuper = true)
-@ToString(callSuper = true)
-class LogEvent extends ByteMessage {
-    private Object log;
-    private JsonByteBuilder byteBuilder = JsonByteBuilder.create(2 * 1024);
-    private WeakReference<JsonByteBuilder> cache = new WeakReference<>(byteBuilder);
-
-    public void clear() {
-        this.log = null;
-        if (byteBuilder != null) {
-            if (byteBuilder.capacity() > 2048) {
-                cache = new WeakReference<>(byteBuilder);
-                byteBuilder = null;
-            } else {
-                byteBuilder.clear();
+        public void clear() {
+            if (byteBuilder != null) {
+                if (byteBuilder.capacity() > 2048) {
+                    cache = new WeakReference<>(byteBuilder);
+                    byteBuilder = null;
+                } else {
+                    byteBuilder.clear();
+                }
             }
         }
-    }
 
-    public JsonByteBuilder getByteBuilder() {
-        if (null == byteBuilder) {
-            byteBuilder = cache.get();
+        public JsonByteBuilder getByteBuilder() {
             if (null == byteBuilder) {
-                byteBuilder = JsonByteBuilder.create(2048);
+                byteBuilder = cache.get();
+                if (null == byteBuilder) {
+                    byteBuilder = JsonByteBuilder.create(2048);
+                }
             }
+            return byteBuilder;
         }
-        return byteBuilder;
+
+        @Override
+        public void apply(ByteEvent event) {
+            event.clear();
+
+            ByteBuffer buff = byteBuilder.toByteBuffer(event.getBuffer());
+            event.setId(this.getId());
+            event.setBuffer(buff);
+            event.setBufferLen(buff.position());
+        }
     }
 
-    @Override
-    public void apply(ByteEvent event) {
-        event.clear();
-        event.setId(this.getId());
-        ByteBuffer buff = byteBuilder.toByteBuffer(event.getBuffer());
-        event.setBuffer(buff);
-        event.setBufferLen(buff.position());
-    }
+
 }
-

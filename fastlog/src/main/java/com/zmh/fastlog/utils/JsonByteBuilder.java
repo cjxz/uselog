@@ -1,38 +1,34 @@
 package com.zmh.fastlog.utils;
 
-import lombok.Getter;
 import lombok.NonNull;
 
 import java.nio.ByteBuffer;
-import java.nio.CharBuffer;
-import java.nio.charset.CharsetEncoder;
 
 import static com.zmh.fastlog.utils.BufferUtils.marginToBuffer;
-import static java.lang.System.arraycopy;
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.isNull;
 
 public class JsonByteBuilder {
-    private final static char[] escapeTab = new char[256];
+
+    private final static byte[] escapeTab = new byte[128];
 
     static {
-        escapeTab[0] = '0'; // 空字符(NULL) 000
-        escapeTab[7] = 'a'; // 响铃(BEL) 007
-        escapeTab[8] = 'b'; // 退格(BS) 008
-        escapeTab[9] = 't'; // 水平制表(HT) 009
-        escapeTab[10] = 'n'; // 换行(LF) 010
-//        escapeTab[11] = 'v'; // 垂直制表(VT) 011
-        escapeTab[12] = 'f'; // 换页(FF) 012
-        escapeTab[13] = 'r'; // 回车(CR) 013
-        escapeTab[34] = '"'; // 双引号字符 034
-        escapeTab[92] = '\\'; // 反斜杠 092
+        for (int i = 1; i < 31; i++) {
+            escapeTab[i] = 1;
+        }
+        escapeTab[0] = 2; // 空字符(NULL) 000
+        escapeTab[7] = 2; // a 响铃(BEL) 007
+        escapeTab[8] = 2; // b 退格(BS) 008
+        escapeTab[9] = 2; // t 水平制表(HT) 009
+        escapeTab[10] = 2; // n 换行(LF) 010
+        escapeTab[12] = 2; // f 换页(FF) 012
+        escapeTab[13] = 2; // r 回车(CR) 013
+        escapeTab[34] = 2; // " 双引号字符 034
+        escapeTab[92] = 2; // \ 反斜杠 092
     }
 
-    @Getter
-    private CharBuffer buffer;
-    private char[] bufferArray;
+
+    private byte[] bufferArray;
     private int pos;
-    private int utf8CharCount = 0;
 
     private boolean[] firstKey = new boolean[10];
     private boolean[] firstValue = new boolean[10];
@@ -84,11 +80,8 @@ public class JsonByteBuilder {
 
     public JsonByteBuilder clear() {
         this.firstElementPos = -1;
-        this.utf8CharCount = 0;
-        if (isNull(this.buffer)) {
-            this.bufferArray = new char[64];
-            this.buffer = CharBuffer.wrap(bufferArray);
-        }
+        this.bufferArray = new byte[256];
+
         this.pos = 0;
         return this;
     }
@@ -99,89 +92,86 @@ public class JsonByteBuilder {
 
     private JsonByteBuilder(int bufferLen) {
         bufferLen = marginToBuffer(bufferLen);
-        this.bufferArray = new char[bufferLen];
-        this.buffer = CharBuffer.wrap(this.bufferArray);
+        this.bufferArray = new byte[bufferLen];
         this.pos = 0;
         clear();
     }
 
-
     private void ensureCapacity(int length) {
         int additionLength = pos + length;
         if (bufferArray.length < additionLength) {
+            byte[] src = bufferArray;
+
+            additionLength += Math.min(additionLength, pos);
             additionLength = marginToBuffer(additionLength);
-            bufferArray = new char[additionLength];
-            arraycopy(buffer.array(), 0, bufferArray, 0, buffer.capacity());
-            buffer = CharBuffer.wrap(bufferArray);
+            bufferArray = new byte[additionLength];
+
+            System.arraycopy(src, 0, bufferArray, 0, pos);
         }
     }
 
-    private void addAscii(char ascii) {
-        char[] arr = this.bufferArray;
-        if (pos >= arr.length) {
+    private void addAscii(byte c) {
+        if (this.bufferArray.length - this.pos < 1) {
             ensureCapacity(1);
-            arr = this.bufferArray;
         }
-        arr[pos++] = ascii;
+        this.bufferArray[pos++] = c;
     }
 
-
-    private JsonByteBuilder addAscii(char ascii, char ascii2) {
-        char[] arr = this.bufferArray;
-        int pos = this.pos;
-        if (pos + 2 > arr.length) {
-            ensureCapacity(2);
-            arr = this.bufferArray;
-        }
-        arr[pos++] = ascii;
-        arr[pos++] = ascii2;
-        this.pos = pos;
-        return this;
-    }
-
-
-    private final static char[] HEX_STRING = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
+    private final static byte[] HEX_BYTE = {48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 65, 66, 67, 68, 69, 70};
 
     private void writeString(String str) {
-        int length = str.length();
-        int len2 = length << 1;
-        int pos = this.pos;
-        char[] arr = this.bufferArray;
-        int utf8 = 0;
+        int sLength = str.length();
 
-        if (arr.length - pos < len2) {
-            ensureCapacity(len2);
+        byte[] arr = this.bufferArray;
+        int pos = this.pos;
+
+        int len = sLength << 2;
+        if (arr.length - pos < len) {
+            ensureCapacity(len);
             arr = this.bufferArray;
         }
 
-        int src = arr.length - length;
-        str.getChars(0, length, arr, src);
-        int srcPos = src;
-        for (int i = 0; i < length; i++) {
-            char c = arr[srcPos++];
-            if (0 == (c & 0xFF80)) { // ascii, 0-7F,
-                char escape = escapeTab[c];
-                if (escape != 0) {
-                    arr[pos++] = '\\';
-                    arr[pos++] = escape;
-                } else if (c < 32) { // control char
-                    arr[pos++] = '\\';
-                    arr[pos++] = 'u';
-                    arr[pos++] = '0';
-                    arr[pos++] = '0';
-                    char hi = (char) (c >> 4);
-                    char low = (char) (c & 0x0f);
-                    arr[pos++] = HEX_STRING[hi];
-                    arr[pos++] = HEX_STRING[low];
+        for (int sIndex = 0; sIndex < sLength; sIndex++) {
+            char c = str.charAt(sIndex);
+
+            if (c < '\u0080') {
+                byte b = (byte) c;
+
+                if (escapeTab[b] == 0) {
+                    arr[pos++] = b;
+                } else if (escapeTab[b] == 2) {
+                    arr[pos++] = 92; // 92 = \
+                    arr[pos++] = b;
                 } else {
-                    arr[pos++] = c;
+                    arr[pos++] = 92; // 92 = \
+                    arr[pos++] = 117; // 117 = u
+                    arr[pos++] = 48; // 48 = 0
+                    arr[pos++] = 48; // 48 = 0
+                    byte hi = (byte) (b >> 4);
+                    byte low = (byte) (b & 0x0f);
+                    arr[pos++] = HEX_BYTE[hi];
+                    arr[pos++] = HEX_BYTE[low];
                 }
+            } else if (c < '\u0800') {
+                arr[pos++] = (byte) (192 | c >>> 6);
+                arr[pos++] = (byte) (128 | c & 63);
+            } else if (c < '\ud800' || c > '\udfff') {
+                arr[pos++] = (byte) (224 | c >>> 12);
+                arr[pos++] = (byte) (128 | c >>> 6 & 63);
+                arr[pos++] = (byte) (128 | c & 63);
             } else {
-                utf8++;
-                arr[pos++] = c;
+                int cp = 0;
+                if (++sIndex < sLength) cp = Character.toCodePoint(c, str.charAt(sIndex));
+                if ((cp >= 1 << 16) && (cp < 1 << 21)) {
+                    arr[pos++] = (byte) (240 | cp >>> 18);
+                    arr[pos++] = (byte) (128 | cp >>> 12 & 63);
+                    arr[pos++] = (byte) (128 | cp >>> 6 & 63);
+                    arr[pos++] = (byte) (128 | cp & 63);
+                } else
+                    arr[pos++] = (byte) '?';
             }
         }
-        utf8CharCount += utf8;
+
         this.pos = pos;
     }
 
@@ -197,13 +187,13 @@ public class JsonByteBuilder {
         firstKey[++firstElementPos] = true;
         firstValue[firstElementPos] = true;
         isObject[firstElementPos] = true;
-        addAscii('{');
+        addAscii((byte) '{');
         return this;
     }
 
     public JsonByteBuilder endObject() {
         firstElementPos--;
-        addAscii('}');
+        addAscii((byte) '}');
         return this;
     }
 
@@ -211,33 +201,30 @@ public class JsonByteBuilder {
         firstKey[++firstElementPos] = true;
         firstValue[firstElementPos] = true;
         isObject[firstElementPos] = false;
-        addAscii('[');
+        addAscii((byte) '[');
         return this;
     }
 
     public JsonByteBuilder endArray() {
         firstElementPos--;
-        addAscii(']');
+        addAscii((byte) ']');
         return this;
     }
 
     private void comma() {
-        addAscii(',');
+        addAscii((byte) ',');
     }
 
     public JsonByteBuilder key(@NonNull String key) {
-        int length = key.length();
-        int len2 = (length << 1) + 4;
-        char[] arr = this.bufferArray;
-        if (arr.length - this.pos < len2) {
-            ensureCapacity(len2);
-            arr = this.bufferArray;
+        int len = key.length() << 2;
+        if (this.bufferArray.length - this.pos < len) {
+            ensureCapacity(len);
         }
         markFirstKey();
-        arr[this.pos++] = '"';
+        addAscii((byte) '"');
         writeString(key);
-        arr[this.pos++] = '"';
-        arr[this.pos++] = ':';
+        addAscii((byte) '"');
+        addAscii((byte) ':');
         return this;
     }
 
@@ -246,39 +233,40 @@ public class JsonByteBuilder {
         if (isNull(value)) {
             writeString("null");
         } else {
-            addAscii('"');
+            addAscii((byte) '"');
             writeString(value);
-            addAscii('"');
+            addAscii((byte) '"');
         }
         return this;
     }
 
     public JsonByteBuilder value(long value) {
         markFirstValue();
-        char[] arr = this.bufferArray;
+        byte[] arr = this.bufferArray;
         int pos = this.pos;
         if (pos + 20 > arr.length) {
             ensureCapacity(20);
             arr = this.bufferArray;
         }
         if (0 == value) {
-            arr[this.pos++] = '0';
+            arr[pos++] = 48; // 48 = 0
+            this.pos = pos;
             return this;
         }
         if (value < 0) {
-            arr[pos++] = '-';
+            arr[pos++] = 45; // 45 = -
             value = -value;
         }
         int begin = pos;
         while (value > 0) {
             int n = (int) (value % 10);
             value /= 10;
-            arr[pos++] = (char) (n | 0x30);
+            arr[pos++] = (byte) (n | 0x30);
         }
         this.pos = pos;
         int end = pos - 1;
         while (begin < end) {
-            char t = arr[begin];
+            byte t = arr[begin];
             arr[begin] = arr[end];
             arr[end] = t;
             begin++;
@@ -307,7 +295,6 @@ public class JsonByteBuilder {
         return new String(bufferArray, 0, pos);
     }
 
-    private CharsetEncoder encoder = UTF_8.newEncoder();
     private static final ByteBuffer EMPTY_BYTE_BUFFER = ByteBuffer.allocate(0);
 
     public ByteBuffer toByteBuffer(ByteBuffer bb) {
@@ -315,20 +302,15 @@ public class JsonByteBuilder {
             bb = EMPTY_BYTE_BUFFER;
         }
         ByteBuffer result = bb;
-        int estaLen = pos + (utf8CharCount << 1);
-        if (bb.remaining() < estaLen) {
-            int len = bb.position() + estaLen;
+        if (bb.remaining() < pos) {
+            int len = bb.position() + pos;
             len = marginToBuffer(len);
             byte[] arr = new byte[len];
             System.arraycopy(bb.array(), 0, arr, 0, bb.capacity());
             result = ByteBuffer.wrap(arr);
             result.position(bb.position());
         }
-        int limit = result.limit();
-        buffer.position(0)
-            .limit(pos);
-        encoder.reset().encode(buffer, result, true);
+        result.put(bufferArray, 0, pos);
         return result;
     }
-
 }

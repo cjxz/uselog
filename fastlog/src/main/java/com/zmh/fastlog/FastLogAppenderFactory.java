@@ -4,10 +4,8 @@ import com.zmh.fastlog.config.FastLogConfig;
 import com.zmh.fastlog.producer.KafkaEventProducer;
 import com.zmh.fastlog.producer.MqEventProducer;
 import com.zmh.fastlog.producer.PulsarEventProducer;
-import com.zmh.fastlog.worker.FileQueueWorker;
-import com.zmh.fastlog.worker.LogWorker;
-import com.zmh.fastlog.worker.MqEventWorker;
-import com.zmh.fastlog.worker.Worker;
+import com.zmh.fastlog.worker.*;
+import com.zmh.fastlog.worker.LogWorker.LogEvent;
 import lombok.Setter;
 
 import static java.util.Objects.nonNull;
@@ -47,11 +45,11 @@ class WorkerRef<T> implements Worker<T> {
 class AppenderFacade implements Worker<Object> {
     private WorkerRef<Object> logWorker = new WorkerRef<>();
     private WorkerRef<Object> pulsarWorker = new WorkerRef<>();
-    private WorkerRef<Object> fileQueueWorker = new WorkerRef<>();
+    private WorkerRef<LogEvent> fileQueueWorker = new WorkerRef<>();
 
     public AppenderFacade(FastLogConfig config) {
         try {
-            fileQueueWorker.setDelegate(new FileQueueWorker(pulsarWorker));
+            fileQueueWorker.setDelegate(new FileWorker(pulsarWorker));
 
             logWorker.setDelegate(new LogWorker(pulsarWorker, fileQueueWorker, config.getBatchSize(), config.getAdditionalFields()));
 

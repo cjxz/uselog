@@ -1,15 +1,14 @@
 package com.zmh.fastlog.utils;
 
-import lombok.val;
+import lombok.SneakyThrows;
 import org.junit.Test;
-
-import java.nio.ByteBuffer;
 
 import static org.junit.Assert.assertEquals;
 
-public class JsonByteBuilderTest {
+public class JsonByteBuilderTest { //todo zmh 加一个ensure的单元测试
 
     @Test
+    @SneakyThrows
     public void test() {
         JsonByteBuilder json = JsonByteBuilder.create()
             .beginObject()
@@ -82,18 +81,5 @@ public class JsonByteBuilderTest {
             .endObject()
             .toString();
         assertEquals("{\"the中文key\":\"enn.中文..value\"}", json);
-    }
-
-    @Test
-    public void testToByteArray() {
-        val json = JsonByteBuilder.create()
-            .beginObject()
-            .key("the中文key").value("enn.中文..value")
-            .endObject();
-
-        ByteBuffer byteBuffer = json.toByteBuffer(null);
-        String s = new String(byteBuffer.array(), 0, byteBuffer.position());
-        assertEquals("{\"the中文key\":\"enn.中文..value\"}", s);
-        assertEquals("{\"the中文key\":\"enn.中文..value\"}", json.toString());
     }
 }

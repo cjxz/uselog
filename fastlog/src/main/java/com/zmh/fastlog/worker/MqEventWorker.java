@@ -59,10 +59,20 @@ public class MqEventWorker implements Worker<Object>,
         connectFuture.cancel(success);
     }
 
+    @Override
+    public boolean sendMessage(Object message) {
+        ByteMessage msg = (ByteMessage) message;
+        return !isDisposed && ringBuffer.tryPublishEvent((e, s) -> {
+            ByteEvent byteEvent = e.getByteEvent();
+            msg.apply(byteEvent);
+        });
+    }
+
     private long lastMessageId;
 
     private long messageCount;
 
+    @Override
     public void onEvent(MqEvent event, long sequence, boolean endOfBatch) {
         ByteEvent byteEvent = event.getByteEvent();
         long lastMessageId = byteEvent.getId();
@@ -97,7 +107,7 @@ public class MqEventWorker implements Worker<Object>,
         }
         if (lastSendSeqId != lastMessageId || (nextSendSeqTime < currentTimeMillis())) {
             final long l = currentTimeMillis();
-            debugLog("mq sync seq:" + lastMessageId + "," + l);
+            //debugLog("mq sync seq:" + lastMessageId + "," + l);
             logWorker.sendMessage(new LastSeq(lastMessageId));
             nextSendSeqTime = l + 1000;
             lastSendSeqId = sequence;
@@ -117,14 +127,6 @@ public class MqEventWorker implements Worker<Object>,
         }
         producer.close();
         debugLog("producer closed, total message count:" + messageCount);
-    }
-
-    public boolean sendMessage(Object message) {
-        ByteMessage msg = (ByteMessage) message;
-        return !isDisposed && ringBuffer.tryPublishEvent((e, s) -> {
-            ByteEvent byteEvent = e.getByteEvent();
-            msg.apply(byteEvent);
-        });
     }
 
     private int batchIndex;

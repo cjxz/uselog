@@ -66,6 +66,8 @@ class DataByteMessage extends ByteMessage {
         }
         arraycopy(data, 0, buffer.array(), 0, dataLength);
         event.setBufferLen(dataLength);
+
+        buffer.limit(dataLength);
     }
 
 }

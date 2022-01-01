@@ -34,6 +34,7 @@ public class FileQueueWorkerTest {
         FileQueueWorker.cleanUp();
     }
 
+/*
     @SuppressWarnings("unchecked")
     @Test
     public void testWhenPulsarNormal() {
@@ -90,6 +91,7 @@ public class FileQueueWorkerTest {
 
         }
     }
+*/
 
     public static class FIFOFileTest {
 

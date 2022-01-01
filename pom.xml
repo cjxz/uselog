@@ -11,6 +11,7 @@
     <modules>
         <module>demo</module>
         <module>fastlog</module>
+        <module>ringbufferdemo</module>
     </modules>
 
     <build>

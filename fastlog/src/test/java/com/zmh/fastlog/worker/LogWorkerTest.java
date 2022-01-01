@@ -5,6 +5,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.classic.spi.LoggingEvent;
+import com.zmh.fastlog.worker.LogWorker.LogEvent;
 import lombok.SneakyThrows;
 import org.junit.Test;
 
@@ -37,7 +38,7 @@ public class LogWorkerTest {
     public void toPulsarTest() {
         Worker<Object> pulsarWorker = mock(Worker.class);
         when(pulsarWorker.sendMessage(any())).thenReturn(true);
-        Worker<Object> fileWorker = mock(Worker.class);
+        Worker<LogEvent> fileWorker = mock(Worker.class);
 
         try (LogWorker logWorker = new LogWorker(pulsarWorker, fileWorker, 1024,null)) {
             when(fileWorker.sendMessage(any()))
@@ -78,7 +79,7 @@ public class LogWorkerTest {
     public void pulsarToFileTest() {
         Worker<Object> pulsarWorker = mock(Worker.class);
         when(pulsarWorker.sendMessage(any())).thenReturn(false);
-        Worker<Object> fileWorker = mock(Worker.class);
+        Worker<LogEvent> fileWorker = mock(Worker.class);
         when(fileWorker.sendMessage(any())).thenReturn(true);
 
         try (LogWorker logWorker = new LogWorker(pulsarWorker, fileWorker, 1024, null)) {
@@ -107,7 +108,7 @@ public class LogWorkerTest {
     public void missingCountTest() {
         Worker<Object> pulsarWorker = mock(Worker.class);
         when(pulsarWorker.sendMessage(any())).thenReturn(false);
-        Worker<Object> fileWorker = mock(Worker.class);
+        Worker<LogEvent> fileWorker = mock(Worker.class);
         when(fileWorker.sendMessage(any())).thenReturn(false);
 
         try (LogWorker logWorker = new LogWorker(pulsarWorker, fileWorker, 1024,null)) {

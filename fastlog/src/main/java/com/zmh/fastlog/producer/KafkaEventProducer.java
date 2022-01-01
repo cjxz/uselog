@@ -1,17 +1,16 @@
 package com.zmh.fastlog.producer;
 
-import org.apache.commons.lang3.time.DateFormatUtils;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.ByteBufferSerializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 
 import java.nio.ByteBuffer;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
-import static com.zmh.fastlog.utils.Utils.*;
+import static com.zmh.fastlog.utils.Utils.safeClose;
+import static com.zmh.fastlog.utils.Utils.sneakyInvoke;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
@@ -56,31 +55,16 @@ public class KafkaEventProducer implements MqEventProducer {
 
     @Override
     public void sendEvent(MqEvent event) {
-        //event.getBuffer().limit(event.getBufferLen()); todo zmh
-        ProducerRecord<String, ByteBuffer> record = new ProducerRecord<>(topic, event.getByteEvent().getBuffer());
+        ByteEvent byteEvent = event.getByteEvent();
+        ProducerRecord<String, ByteBuffer> record = new ProducerRecord<>(topic, byteEvent.getBuffer());
 
         producer.send(record, (metadata, e) -> {
             if (nonNull(e)) {
                 e.printStackTrace();
             } else {
                 event.clear();
-                logTime();
             }
         });
-    }
-
-    private int logIndex;
-    private int interval;
-
-    private void logTime() {
-        logIndex++;
-        if (logIndex > 99_0000) {
-            interval++;
-            if (interval == 100) {
-                interval = 0;
-                debugLog(logIndex + ":" + DateFormatUtils.format(new Date(), "yyyy-MM-dd HH:mm:ss SSS"));
-            }
-        }
     }
 
     @Override

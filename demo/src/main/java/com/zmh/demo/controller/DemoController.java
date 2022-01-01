@@ -1,5 +1,6 @@
 package com.zmh.demo.controller;
 
+import com.google.common.util.concurrent.RateLimiter;
 import com.zmh.fastlog.utils.ThreadUtils;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -14,6 +15,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
+import java.util.stream.IntStream;
 
 import static com.zmh.fastlog.utils.Utils.debugLog;
 import static com.zmh.fastlog.utils.Utils.getNowTime;
@@ -22,6 +24,8 @@ import static java.util.Objects.nonNull;
 @RestController
 @Slf4j
 public class DemoController {
+
+    private RateLimiter limiter = RateLimiter.create(60_0000);
 
     @GetMapping("test")
     public void test() {
@@ -34,11 +38,15 @@ public class DemoController {
 
     @GetMapping("testLog")
     public void testLog() {
-        ThreadUtils.sleep(3_000);
         debugLog("begin:" + getNowTime());
-        for (int i = 0; i < 100_0000; i++) {
-            log.info(getText(100) + i);
-        }
+
+        String text = getText(100);
+        IntStream.range(0, 100_0000)
+            .parallel()
+            .forEach(i -> {
+                log.info(text);
+                //limiter.acquire();
+            });
         debugLog("end:" + getNowTime());
     }
 

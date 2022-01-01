@@ -9,6 +9,7 @@ import com.lmax.disruptor.dsl.ProducerType;
 import com.zmh.fastlog.producer.ByteEvent;
 import com.zmh.fastlog.utils.ThreadUtils;
 import com.zmh.fastlog.utils.Utils;
+import com.zmh.fastlog.worker.LogWorker.LogEvent;
 import lombok.*;
 import lombok.experimental.Delegate;
 import org.rocksdb.*;
@@ -41,13 +42,13 @@ import static org.rocksdb.RocksDB.DEFAULT_COLUMN_FAMILY;
 /**
  * @author zmh
  */
-public class FileQueueWorker implements Worker<Object>, EventHandler<FileQueueEvent>, TimeoutHandler {
+public class FileQueueWorker implements Worker<LogEvent>, EventHandler<FileQueueEvent>, TimeoutHandler {
     private final Worker<Object> pulsarWorker;
     private final Disruptor<FileQueueEvent> queue;
     private final RingBuffer<FileQueueEvent> ringBuffer;
     private final FIFOFile fifo;
-    private static final int BUFFER_SIZE = 256;
-    private static final int HIGH_WATER_LEVEL_FILE = 128;
+    private static final int BUFFER_SIZE = 2048;
+    private static final int HIGH_WATER_LEVEL_FILE = BUFFER_SIZE >> 1;
 
     private static ThreadFactory THREAD_FACTORY = ThreadUtils.namedDaemonThreadFactory("log-filequeue-worker");
 
@@ -74,14 +75,9 @@ public class FileQueueWorker implements Worker<Object>, EventHandler<FileQueueEv
     }
 
     @Override
-    public boolean sendMessage(Object message) {
+    public boolean sendMessage(LogEvent message) {
         return ringBuffer.tryPublishEvent((e, s) -> {
-            e.clear();
-            if (message instanceof ByteMessage) {
-                ((ByteMessage) message).apply(e.getByteEvent());
-            } else {
-                e.setEvent(message);
-            }
+            message.apply(e.getByteEvent());
         });
     }
 
@@ -89,7 +85,6 @@ public class FileQueueWorker implements Worker<Object>, EventHandler<FileQueueEv
         Object message = event.getEvent();
         if (message instanceof ByteEvent) {
             ByteEvent msg = (ByteEvent) message;
-//            debugLog("cache message:" + msg.getId());
             fifo.addItem(msg.getId(), msg.getBuffer().array(), msg.getBufferLen());
         } else {
             long lastSeq = ((LastSeq) message).getSeq();
@@ -97,7 +92,6 @@ public class FileQueueWorker implements Worker<Object>, EventHandler<FileQueueEv
         }
         if (endOfBatch) {
             this.onTimeout(sequence);
-            //debugLog("file size:" + (ringBuffer.getCursor() - sequence));
         }
         event.clear();
     }
