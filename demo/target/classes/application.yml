@@ -1,9 +1,0 @@
-server:
-  port: 8090
-fastlog:
-  enable: true
-  url: 10.106.112.57:9092
-  topic: log4
-  batchMessageSize: 4096
-  type: kafka
-  partition: 4
