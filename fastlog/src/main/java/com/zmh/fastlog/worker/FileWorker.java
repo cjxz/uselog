@@ -13,11 +13,12 @@ import com.zmh.fastlog.worker.backend.LogFiles;
 import io.appulse.utils.Bytes;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.SneakyThrows;
 import lombok.val;
 
 import java.lang.ref.SoftReference;
 import java.nio.ByteBuffer;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.nio.file.Files;
 
 import static com.zmh.fastlog.utils.BufferUtils.marginToBuffer;
 import static com.zmh.fastlog.utils.ThreadUtils.namedDaemonThreadFactory;
@@ -65,7 +66,7 @@ public class FileWorker implements Worker<LogEvent>, EventHandler<FileEvent>, Ti
         event.clear();
 
         if (endOfBatch) {
-            onTimeout(sequence);
+            onTimeout(sequence) ;
         }
     }
 
@@ -73,7 +74,7 @@ public class FileWorker implements Worker<LogEvent>, EventHandler<FileEvent>, Ti
     public void onTimeout(long sequence) {
         ByteMessage message;
         while (ringBuffer.getCursor() - sequence <= HIGH_WATER_LEVEL_FILE && nonNull(message = fifo.get())) {
-            if (isClose || !pulsarWorker.sendMessage(message)) {
+            if (isClose || !pulsarWorker.sendMessage(message)) {  //todo zmh 这里得比后续Kafka后加载，避免大量日志发出去报错。
                 return;
             }
             fifo.next();
@@ -134,23 +135,26 @@ class FIFOFileQueue implements AutoCloseable {
 
     private final BytesCacheQueue head;
 
-    private final Bytes bytesClone;
 
+    @SneakyThrows
     FIFOFileQueue(int cacheSize) {
-        logFiles = LogFiles.builder()
-            .queueName("queue")
-            .restoreFromDisk(true)
-            .config(WalFilesConfig.builder()
-                .folder("logs/cache")
-                .maxCount(100)
-                .build())
+        WalFilesConfig config = WalFilesConfig.builder()
+            .folder("logs/cache")
+            .maxCount(100)
             .build();
 
-        //Files.createDirectories(backend.); todo zmh cannot not-exit
+        if (!Files.exists(config.getFolder())) {
+            Files.createDirectories(config.getFolder());
+        }
+
+        logFiles = LogFiles.builder()
+            .queueName("queue")
+            .config(config)
+            .cacheSize(cacheSize)
+            .build();
 
         tail = new BytesCacheQueue(cacheSize);
         head = new BytesCacheQueue(cacheSize);
-        bytesClone = Bytes.allocate(cacheSize + Integer.BYTES);
     }
 
     public void put(ByteEvent byteBuffer) {
@@ -181,8 +185,7 @@ class FIFOFileQueue implements AutoCloseable {
         }
 
         if (fileSize() > 0) {
-            logFiles.pollTo(bytesClone);
-            head.readFrom(bytesClone);
+            logFiles.pollTo(head.getBytes());
             message = head.get();
             return message;
         }
@@ -204,8 +207,7 @@ class FIFOFileQueue implements AutoCloseable {
         if (tail.isEmpty()) {
             return;
         }
-        tail.writeTo(bytesClone);
-        logFiles.write(bytesClone);
+        logFiles.write(tail.getBytes());
         tail.reset();
     }
 
@@ -222,11 +224,8 @@ class BytesCacheQueue {
     @Getter
     private final Bytes bytes;
 
-    private AtomicInteger size;
-
     public BytesCacheQueue(int size) {
         this.bytes = Bytes.allocate(size);
-        this.size = new AtomicInteger();
     }
 
     public boolean put(ByteEvent event) {
@@ -243,7 +242,6 @@ class BytesCacheQueue {
         this.bytes.writeNB(bb.array());
 
         this.bytes.set4B(writerIndex, this.bytes.writerIndex() - writerIndex - Integer.BYTES - Long.BYTES); // write real length
-        this.size.incrementAndGet();
         return true;
     }
 
@@ -260,7 +258,6 @@ class BytesCacheQueue {
             }
             long id = this.bytes.readLong();
             this.bytes.readBytes(readBuffer, 0, readCount);
-            this.size.decrementAndGet();
 
             return new DataByteMessage(id, readBuffer, readCount);
         } else if (readCount == -1) {
@@ -271,39 +268,17 @@ class BytesCacheQueue {
 
     public void reset() {
         this.bytes.reset();
-        this.size = new AtomicInteger();
     }
 
     public boolean isEmpty() {
-        return size.get() == 0;
-    }
-
-    public int getSize() {
-        return size.get();
+        return bytes.readableBytes() == 0;
     }
 
     public void copyTo(BytesCacheQueue queue) {
         queue.reset();
 
         queue.bytes.writeNB(this.bytes.array(), this.bytes.readerIndex(), this.bytes.readableBytes());
-        queue.size = new AtomicInteger(getSize());
     }
-
-    public void readFrom(Bytes clone) {
-        reset();
-
-        int size = clone.readInt();
-        this.size = new AtomicInteger(size);
-        this.bytes.writeNB(clone.array(), clone.readerIndex(), clone.readableBytes());
-    }
-
-    public void writeTo(Bytes clone) {
-        clone.reset();
-
-        clone.write4B(getSize());
-        clone.writeNB(this.bytes.array(), this.bytes.readerIndex(), this.bytes.readableBytes());
-    }
-
 
 }
 

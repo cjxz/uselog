@@ -21,3 +21,6 @@ bin/
 gen/
 rebel.xml
 *.flattened-pom.xml
+
+logs/*
+*.DS_Store

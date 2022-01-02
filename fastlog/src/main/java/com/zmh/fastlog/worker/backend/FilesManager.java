@@ -127,12 +127,15 @@ final class FilesManager implements AutoCloseable {
         } while (Files.exists(result));
 
         Files.createFile(result);
-        queue.add(result);
         return result;
     }
 
     Path poll() {
         return queue.poll();
+    }
+
+    void addFile(Path path) {
+        queue.add(path);
     }
 
     @SneakyThrows
@@ -141,15 +144,5 @@ final class FilesManager implements AutoCloseable {
             Files.deleteIfExists(path);
             queue.remove(path);
         }
-    }
-
-    void remove(@NonNull Collection<Path> paths) {
-        val array = paths.toArray(new Path[0]);
-        remove(array);
-    }
-
-    void clear() {
-        remove(queue);
-        index.set(0);
     }
 }
