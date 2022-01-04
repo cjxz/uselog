@@ -9,18 +9,15 @@ import com.lmax.disruptor.dsl.ProducerType;
 import com.zmh.fastlog.config.WalFilesConfig;
 import com.zmh.fastlog.producer.ByteEvent;
 import com.zmh.fastlog.worker.LogWorker.LogEvent;
-import com.zmh.fastlog.worker.backend.LogFiles;
-import io.appulse.utils.Bytes;
-import lombok.Getter;
+import com.zmh.fastlog.worker.file.BytesCacheQueue;
+import com.zmh.fastlog.worker.file.LogFiles;
+import com.zmh.fastlog.worker.file.TwoBytesCacheQueue;
 import lombok.Setter;
 import lombok.SneakyThrows;
-import lombok.val;
 
 import java.lang.ref.SoftReference;
-import java.nio.ByteBuffer;
 import java.nio.file.Files;
 
-import static com.zmh.fastlog.utils.BufferUtils.marginToBuffer;
 import static com.zmh.fastlog.utils.ThreadUtils.namedDaemonThreadFactory;
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
@@ -55,9 +52,7 @@ public class FileWorker implements Worker<LogEvent>, EventHandler<FileEvent>, Ti
 
     @Override
     public boolean sendMessage(LogEvent message) {
-        return ringBuffer.tryPublishEvent((e, s) -> {
-            message.apply(e.getByteEvent());
-        });
+        return ringBuffer.tryPublishEvent((e, s) -> message.apply(e.getByteEvent()));
     }
 
     @Override
@@ -66,7 +61,7 @@ public class FileWorker implements Worker<LogEvent>, EventHandler<FileEvent>, Ti
         event.clear();
 
         if (endOfBatch) {
-            onTimeout(sequence) ;
+            onTimeout(sequence);
         }
     }
 
@@ -126,10 +121,9 @@ class FileEvent {
     }
 }
 
-
 class FIFOFileQueue implements AutoCloseable {
 
-    private final BytesCacheQueue tail;
+    private final TwoBytesCacheQueue tail;
 
     private final LogFiles logFiles;
 
@@ -153,7 +147,7 @@ class FIFOFileQueue implements AutoCloseable {
             .cacheSize(cacheSize)
             .build();
 
-        tail = new BytesCacheQueue(cacheSize);
+        tail = new TwoBytesCacheQueue(cacheSize);
         head = new BytesCacheQueue(cacheSize);
     }
 
@@ -167,6 +161,7 @@ class FIFOFileQueue implements AutoCloseable {
             tail.reset();
         } else {
             flush();
+            tail.switchHead();
         }
 
         tail.put(byteBuffer);
@@ -207,8 +202,7 @@ class FIFOFileQueue implements AutoCloseable {
         if (tail.isEmpty()) {
             return;
         }
-        logFiles.write(tail.getBytes());
-        tail.reset();
+        logFiles.write(tail.getUsed());
     }
 
     @Override
@@ -219,66 +213,4 @@ class FIFOFileQueue implements AutoCloseable {
 
 }
 
-
-class BytesCacheQueue {
-    @Getter
-    private final Bytes bytes;
-
-    public BytesCacheQueue(int size) {
-        this.bytes = Bytes.allocate(size);
-    }
-
-    public boolean put(ByteEvent event) {
-        ByteBuffer bb = event.getBuffer();
-        val writerIndex = this.bytes.writerIndex();
-
-        if (writerIndex + Long.BYTES + Integer.BYTES + bb.limit() + Integer.BYTES > bytes.capacity()) {
-            this.bytes.write4B(-1);
-            return false;
-        }
-
-        this.bytes.write4B(0); // write fake length
-        this.bytes.write8B(event.getId());
-        this.bytes.writeNB(bb.array());
-
-        this.bytes.set4B(writerIndex, this.bytes.writerIndex() - writerIndex - Integer.BYTES - Long.BYTES); // write real length
-        return true;
-    }
-
-    private byte[] readBuffer = new byte[5120];
-
-    public DataByteMessage get() {
-        if (bytes.readableBytes() == 0) {
-            return null;
-        }
-        int readCount = this.bytes.readInt();
-        if (readCount > 0) {
-            if (readCount > readBuffer.length) {
-                readBuffer = new byte[marginToBuffer(readCount)];
-            }
-            long id = this.bytes.readLong();
-            this.bytes.readBytes(readBuffer, 0, readCount);
-
-            return new DataByteMessage(id, readBuffer, readCount);
-        } else if (readCount == -1) {
-            reset();
-        }
-        return null;
-    }
-
-    public void reset() {
-        this.bytes.reset();
-    }
-
-    public boolean isEmpty() {
-        return bytes.readableBytes() == 0;
-    }
-
-    public void copyTo(BytesCacheQueue queue) {
-        queue.reset();
-
-        queue.bytes.writeNB(this.bytes.array(), this.bytes.readerIndex(), this.bytes.readableBytes());
-    }
-
-}
 

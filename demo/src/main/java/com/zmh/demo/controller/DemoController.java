@@ -15,7 +15,6 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.IntStream;
 
 import static com.zmh.fastlog.utils.Utils.debugLog;
@@ -41,15 +40,15 @@ public class DemoController {
     public void testLog() {
         debugLog("begin:" + getNowTime());
 
-        String[] text = new String[5000];
-        for (int i = 0; i < 5000; i++) {
+        String[] text = new String[100];
+        for (int i = 0; i < 100; i++) {
             text[i] = getText(100);
         }
 
         IntStream.range(0, 100_0000)
             .parallel()
             .forEach(i -> {
-                log.info(text[i % 5000]);
+                log.info(text[i % 100]);
             });
         debugLog("end:" + getNowTime());
 

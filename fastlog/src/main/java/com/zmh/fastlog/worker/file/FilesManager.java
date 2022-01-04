@@ -1,4 +1,4 @@
-package com.zmh.fastlog.worker.backend;
+package com.zmh.fastlog.worker.file;
 
 import lombok.Builder;
 import lombok.NonNull;
@@ -8,7 +8,6 @@ import lombok.val;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Collection;
 import java.util.LinkedList;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -127,6 +126,7 @@ final class FilesManager implements AutoCloseable {
         } while (Files.exists(result));
 
         Files.createFile(result);
+        this.queue.add(result);
         return result;
     }
 
@@ -134,8 +134,8 @@ final class FilesManager implements AutoCloseable {
         return queue.poll();
     }
 
-    void addFile(Path path) {
-        queue.add(path);
+    Path peek() {
+        return queue.peek();
     }
 
     @SneakyThrows
