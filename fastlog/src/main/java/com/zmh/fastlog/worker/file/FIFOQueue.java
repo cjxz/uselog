@@ -32,7 +32,7 @@ import static java.util.Optional.of;
 import static java.util.Optional.ofNullable;
 import static java.util.stream.Collectors.toCollection;
 
-public class FIFOFileQueue implements AutoCloseable {
+public class FIFOQueue implements AutoCloseable {
 
     private final TwoBytesCacheQueue tail;
 
@@ -41,7 +41,7 @@ public class FIFOFileQueue implements AutoCloseable {
     private final BytesCacheQueue head;
 
     @SneakyThrows
-    FIFOFileQueue(int cacheSize, String folder) {
+    FIFOQueue(int cacheSize, String folder) {
         Path path = Paths.get(folder);
 
         if (!Files.exists(path)) {

@@ -2,31 +2,38 @@ package com.zmh.fastlog.worker.mq.producer;
 
 import com.zmh.fastlog.model.event.ByteDisruptorEvent;
 import com.zmh.fastlog.model.event.ByteEvent;
-import org.apache.kafka.clients.producer.KafkaProducer;
+import lombok.SneakyThrows;
 import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.clients.producer.RecordMetadata;
 import org.apache.kafka.common.serialization.ByteBufferSerializer;
 import org.apache.kafka.common.serialization.StringSerializer;
 
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.Future;
+import java.util.concurrent.atomic.LongAdder;
 
-import static com.zmh.fastlog.utils.Utils.safeClose;
-import static com.zmh.fastlog.utils.Utils.sneakyInvoke;
+import static com.zmh.fastlog.utils.Utils.*;
+import static com.zmh.fastlog.utils.Utils.debugLog;
+import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 
-public class KafkaEventProducer implements MqEventProducer {
+public class KafkaProducer implements MqProducer {
 
-    private KafkaProducer<String, ByteBuffer> producer;
+    private org.apache.kafka.clients.producer.KafkaProducer<String, ByteBuffer> producer;
 
     private final String url;
     private final String topic;
 
     private final int batchMessageSize;
 
-    public KafkaEventProducer(String url, String topic, int batchMessageSize) {
+    private long totalMissingCount = 0;
+    private final LongAdder kafkaMissingCount = new LongAdder();
+
+    public KafkaProducer(String url, String topic, int batchMessageSize) {
         if (isNotBlank(topic)) {
             topic = topic.toLowerCase();
         }
@@ -49,7 +56,7 @@ public class KafkaEventProducer implements MqEventProducer {
         //configs.put("buffer.memory", );// long, 默认值33554432。 Producer可以用来缓存数据的内存大小。todo zmh
 
         try {
-            producer = new KafkaProducer<>(configs, new StringSerializer(), new ByteBufferSerializer());
+            producer = new org.apache.kafka.clients.producer.KafkaProducer<>(configs, new StringSerializer(), new ByteBufferSerializer());
         } catch (Exception ignored) {
         }
         return nonNull(producer);
@@ -62,11 +69,40 @@ public class KafkaEventProducer implements MqEventProducer {
 
         producer.send(record, (metadata, e) -> {
             if (nonNull(e)) {
-                e.printStackTrace();
+                debugLog("fastlog kafka sendEvent fail, e:" + e.getMessage());
+                kafkaMissingCount.increment();
             } else {
                 event.clear();
             }
         });
+    }
+
+    public boolean hasMissedMsg() {
+        long sum = kafkaMissingCount.sumThenReset();
+        boolean result = sum > 0;
+        if (result) {
+            totalMissingCount += sum;
+            debugLog("fastlog kafka mission count:" + sum + ", total:" + totalMissingCount);
+        }
+        return result;
+    }
+
+    @Override
+    @SneakyThrows
+    public boolean heartbeat() {
+        if (isNull(producer)) {
+            return false;
+        }
+
+        ProducerRecord<String, ByteBuffer> record = new ProducerRecord<>(topic, ByteBuffer.wrap("heartbeat".getBytes()));
+        Future<RecordMetadata> send = producer.send(record);
+        try {
+            RecordMetadata recordMetadata = send.get();
+            return nonNull(recordMetadata);
+        } catch (Exception e) {
+            debugLog("fastlog kafka heartbeat fail, e:" + e.getMessage());
+            return false;
+        }
     }
 
     @Override

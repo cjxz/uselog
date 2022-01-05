@@ -26,7 +26,7 @@ public class FileWorkerTest {
     //@Ignore
     @Test
     public void test() {
-        try (FIFOFileQueue fifo = new FIFOFileQueue(64 * 1024 * 1024, "logs/cache")) {
+        try (FIFOQueue fifo = new FIFOQueue(64 * 1024 * 1024, "logs/cache")) {
             StopWatch watch = new StopWatch();
             DateSequence seq = new DateSequence();
 
@@ -84,7 +84,7 @@ public class FileWorkerTest {
 
     @Test
     public void testFIFOFileQueuePutAndGet() {
-        try (FIFOFileQueue fifoFile = new FIFOFileQueue(1024, "logs/cache")) {
+        try (FIFOQueue fifoFile = new FIFOQueue(1024, "logs/cache")) {
             DateSequence seq = new DateSequence();
 
             for (int i = 0; i < 7; i++) {
@@ -98,7 +98,7 @@ public class FileWorkerTest {
 
     @Test
     public void testFIFOFileQueuePutAndGetNum() {
-        try (FIFOFileQueue fifoFile = new FIFOFileQueue(32 * 1024 * 1024, "logs/cache")) {
+        try (FIFOQueue fifoFile = new FIFOQueue(32 * 1024 * 1024, "logs/cache")) {
             DateSequence seq = new DateSequence();
 
             String text = "中文English123中文English123中文English123中文English123中文English123中文English123中文English123中文English123中文English123中文English123中文English123中文English123";
@@ -246,7 +246,7 @@ public class FileWorkerTest {
         return queue.put(byteEvent);
     }
 
-    private void putToFile(int byteSize, FIFOFileQueue file, byte b, long id) {
+    private void putToFile(int byteSize, FIFOQueue file, byte b, long id) {
         byte[] array = new byte[128];
         Arrays.fill(array, b);
 

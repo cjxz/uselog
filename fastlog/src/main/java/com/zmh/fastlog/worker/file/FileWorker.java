@@ -20,14 +20,14 @@ public class FileWorker implements Worker<LogDisruptorEvent>, EventHandler<ByteD
     private final Worker<AbstractMqMessage> mqWorker;
     private final Disruptor<ByteDisruptorEvent> queue;
     private final RingBuffer<ByteDisruptorEvent> ringBuffer;
-    private final FIFOFileQueue fifo;
+    private final FIFOQueue fifo;
     private static final int BUFFER_SIZE = 2048;
     private static final int HIGH_WATER_LEVEL_FILE = BUFFER_SIZE >> 1;
 
     private volatile boolean isClose;
 
     public FileWorker(Worker<AbstractMqMessage> mqWorker, int cacheSize, String folder) {
-        fifo = new FIFOFileQueue(cacheSize, folder);
+        fifo = new FIFOQueue(cacheSize, folder);
 
         this.mqWorker = mqWorker;
         queue = new Disruptor<>(

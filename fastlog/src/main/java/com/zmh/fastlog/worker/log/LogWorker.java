@@ -136,6 +136,7 @@ public class LogWorker implements Worker<Object>,
             message.getLoggerName(),
             "ch.qos.logback",
             "org.apache.pulsar",
+            "org.apache.kafka",
             "org.rocksdb"
         );
     }
@@ -172,7 +173,7 @@ public class LogWorker implements Worker<Object>,
             // 写入失败, 切换到本地文件缓冲区
             if (!success && directWriteToMq) {
                 directWriteToMq = false;
-                debugLog("mq阻塞,切换到file cache," + getNowTime());
+                debugLog("mq阻塞或者没准备好,切换到file cache," + getNowTime());
             }
         }
 

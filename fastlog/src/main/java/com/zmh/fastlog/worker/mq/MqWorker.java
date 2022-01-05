@@ -3,11 +3,12 @@ package com.zmh.fastlog.worker.mq;
 import com.lmax.disruptor.*;
 import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
-import com.zmh.fastlog.worker.Worker;
 import com.zmh.fastlog.model.event.ByteDisruptorEvent;
 import com.zmh.fastlog.model.message.AbstractMqMessage;
 import com.zmh.fastlog.model.message.LastConfirmedSeq;
-import com.zmh.fastlog.worker.mq.producer.MqEventProducer;
+import com.zmh.fastlog.worker.Worker;
+import com.zmh.fastlog.worker.mq.producer.MqProducer;
+import lombok.SneakyThrows;
 
 import java.util.concurrent.ScheduledFuture;
 
@@ -30,12 +31,14 @@ public class MqWorker implements Worker<AbstractMqMessage>,
 
     private final ScheduledFuture<?> connectFuture;
 
-    private volatile MqEventProducer producer;
+    private volatile MqProducer producer;
 
     private volatile boolean isDisposed = false;
     private final int batchSize;
 
-    public MqWorker(Worker<Object> logWorker, MqEventProducer producer, int batchSize) {
+    private boolean isReady;
+
+    public MqWorker(Worker<Object> logWorker, MqProducer producer, int batchSize) {
         this.logWorker = logWorker;
         this.producer = producer;
         this.batchSize = batchSize;
@@ -54,11 +57,10 @@ public class MqWorker implements Worker<AbstractMqMessage>,
     }
 
     private void connect() {
-        boolean success = producer.connect();
-        if (success) {
+        if (producer.connect()) {
             queue.start();
+            connectFuture.cancel(true);
         }
-        connectFuture.cancel(success);
     }
 
     /**
@@ -71,7 +73,7 @@ public class MqWorker implements Worker<AbstractMqMessage>,
      */
     @Override
     public boolean sendMessage(AbstractMqMessage message) {
-        return !isDisposed && ringBuffer.tryPublishEvent((e, s) -> message.apply(e.getByteEvent()));
+        return !isDisposed && isReady && ringBuffer.tryPublishEvent((e, s) -> message.apply(e.getByteEvent()));
     }
 
     private long lastMessageId;
@@ -90,7 +92,7 @@ public class MqWorker implements Worker<AbstractMqMessage>,
         }
         if (endOfBatch) {
             this.lastMessageId = lastMessageId;
-            onTimeout(lastMessageId);
+            sendSeqMsg(lastMessageId);
         }
         messageCount++;
     }
@@ -101,21 +103,34 @@ public class MqWorker implements Worker<AbstractMqMessage>,
     @Override
     public void onTimeout(long sequence) {
         if (sequence < 0) {
+            if (!isReady && producer.heartbeat()) {
+                isReady = true;
+            }
             return;
         }
+        sendSeqMsg(sequence);
+        if (!isReady && producer.heartbeat()) {
+            isReady = true;
+        }
+    }
+
+    private void sendSeqMsg(long sequence) {
+        if (producer.hasMissedMsg()) {
+            isReady = false;
+        }
         if (lastSendSeqId != lastMessageId || (nextSendSeqTime < currentTimeMillis())) {
-            final long l = currentTimeMillis();
             logWorker.sendMessage(new LastConfirmedSeq(lastMessageId));
-            nextSendSeqTime = l + 1000;
+            nextSendSeqTime = currentTimeMillis() + 1000;
             lastSendSeqId = sequence;
         }
     }
 
     @Override
+
+    @SneakyThrows
     public void close() {
         debugLog("producer closing...");
         isDisposed = true;
-        connectFuture.cancel(true);
         try {
             queue.shutdown(60, SECONDS);
         } catch (TimeoutException e) {
