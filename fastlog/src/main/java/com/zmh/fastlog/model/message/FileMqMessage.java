@@ -1,27 +1,22 @@
-package com.zmh.fastlog.worker;
+package com.zmh.fastlog.model.message;
 
-import com.zmh.fastlog.producer.ByteEvent;
+import com.zmh.fastlog.model.event.ByteEvent;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 import java.nio.ByteBuffer;
 
 import static com.zmh.fastlog.utils.BufferUtils.marginToBuffer;
 import static java.lang.System.arraycopy;
 import static java.util.Objects.isNull;
-import static java.util.Objects.nonNull;
 
+@EqualsAndHashCode(callSuper = true)
 @Data
-public class DataByteMessage extends ByteMessage {
+public class FileMqMessage extends AbstractMqMessage {
     private byte[] data;
     private int dataLength;
 
-    public DataByteMessage(long id, byte[] data) {
-        this.setId(id);
-        this.data = data;
-        this.dataLength = nonNull(data) ? data.length : 0;
-    }
-
-    public DataByteMessage(long id, byte[] data, int len) {
+    public FileMqMessage(long id, byte[] data, int len) {
         this.setId(id);
         this.data = data;
         this.dataLength = len;

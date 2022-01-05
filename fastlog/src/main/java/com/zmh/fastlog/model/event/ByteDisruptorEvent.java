@@ -1,14 +1,14 @@
-package com.zmh.fastlog.producer;
+package com.zmh.fastlog.model.event;
+
 
 import java.lang.ref.SoftReference;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 
-public class MqEvent {
+public class ByteDisruptorEvent {
 
-    private SoftReference<ByteEvent> byteEvent = new SoftReference<>(new ByteEvent());
+    private SoftReference<ByteEvent> byteEventRef = new SoftReference<>(new ByteEvent());
 
     private ByteEvent refKeep;
 
@@ -16,10 +16,10 @@ public class MqEvent {
         if (nonNull(refKeep)) {
             return refKeep;
         }
-        ByteEvent event = this.byteEvent.get();
+        ByteEvent event = this.byteEventRef.get();
         if (isNull(event)) {
             event = new ByteEvent();
-            byteEvent = new SoftReference<>(event);
+            byteEventRef = new SoftReference<>(event);
         }
         refKeep = event;
         return event;
@@ -30,12 +30,5 @@ public class MqEvent {
             refKeep.clear();
             refKeep = null;
         }
-    }
-
-    public String getEventString() {
-        if (isNull(refKeep)) {
-            return "";
-        }
-        return new String(refKeep.getBuffer().array(), 0, refKeep.getBufferLen(), UTF_8);
     }
 }

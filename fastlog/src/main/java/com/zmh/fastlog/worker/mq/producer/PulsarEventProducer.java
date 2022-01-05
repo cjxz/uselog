@@ -1,5 +1,6 @@
-package com.zmh.fastlog.producer;
+package com.zmh.fastlog.worker.mq.producer;
 
+import com.zmh.fastlog.model.event.ByteDisruptorEvent;
 import org.apache.pulsar.client.api.Producer;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
@@ -70,7 +71,7 @@ public class PulsarEventProducer implements MqEventProducer {
     }
 
     @Override
-    public void sendEvent(MqEvent event) {
+    public void sendEvent(ByteDisruptorEvent event) {
         TypedMessageBuilderImpl<byte[]> pulsarMessage = (TypedMessageBuilderImpl<byte[]>) producer.newMessage();
 
         int eventSize = event.getByteEvent().getBufferLen();

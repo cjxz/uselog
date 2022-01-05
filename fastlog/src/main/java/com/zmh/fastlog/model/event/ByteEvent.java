@@ -1,4 +1,4 @@
-package com.zmh.fastlog.producer;
+package com.zmh.fastlog.model.event;
 
 import lombok.Data;
 

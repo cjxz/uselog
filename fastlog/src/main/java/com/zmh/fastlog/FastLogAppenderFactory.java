@@ -1,11 +1,16 @@
 package com.zmh.fastlog;
 
 import com.zmh.fastlog.config.FastLogConfig;
-import com.zmh.fastlog.producer.KafkaEventProducer;
-import com.zmh.fastlog.producer.MqEventProducer;
-import com.zmh.fastlog.producer.PulsarEventProducer;
+
 import com.zmh.fastlog.worker.*;
-import com.zmh.fastlog.worker.LogWorker.LogEvent;
+import com.zmh.fastlog.worker.file.FileWorker;
+import com.zmh.fastlog.worker.log.LogWorker;
+import com.zmh.fastlog.model.event.LogDisruptorEvent;
+import com.zmh.fastlog.model.message.AbstractMqMessage;
+import com.zmh.fastlog.worker.mq.MqWorker;
+import com.zmh.fastlog.worker.mq.producer.KafkaEventProducer;
+import com.zmh.fastlog.worker.mq.producer.MqEventProducer;
+import com.zmh.fastlog.worker.mq.producer.PulsarEventProducer;
 import lombok.Setter;
 
 import static java.util.Objects.nonNull;
@@ -44,22 +49,22 @@ class WorkerRef<T> implements Worker<T> {
 
 class AppenderFacade implements Worker<Object> {
     private WorkerRef<Object> logWorker = new WorkerRef<>();
-    private WorkerRef<Object> pulsarWorker = new WorkerRef<>();
-    private WorkerRef<LogEvent> fileQueueWorker = new WorkerRef<>();
+    private WorkerRef<AbstractMqMessage> mqWorker = new WorkerRef<>();
+    private WorkerRef<LogDisruptorEvent> fileWorker = new WorkerRef<>();
 
     public AppenderFacade(FastLogConfig config) {
         try {
-            fileQueueWorker.setDelegate(new FileWorker(pulsarWorker));
+            fileWorker.setDelegate(new FileWorker(mqWorker, config.getFileMemoryCacheSize(), config.getFileCacheFolder()));
 
-            logWorker.setDelegate(new LogWorker(pulsarWorker, fileQueueWorker, config.getBatchSize(), config.getAdditionalFields()));
+            logWorker.setDelegate(new LogWorker(mqWorker, fileWorker, config.getBatchSize(), config.getLogMaxSize(), config.getLargeLogHandlerType()));
 
             MqEventProducer producer = null;
             if ("kafka".equals(config.getType())) {
-                producer = new KafkaEventProducer(config.getUrl(), config.getTopic(), config.getBatchMessageSize());
+                producer = new KafkaEventProducer(config.getUrl(), config.getTopic(), config.getLogBatchHandlerSize());
             } else if ("pulsar".equals(config.getType())) {
-                producer = new PulsarEventProducer(config.getUrl(), config.getTopic(), config.getBatchMessageSize());
+                producer = new PulsarEventProducer(config.getUrl(), config.getTopic(), config.getLogBatchHandlerSize());
             }
-            pulsarWorker.setDelegate(new MqEventWorker(logWorker, producer, config.getBatchSize()));
+            mqWorker.setDelegate(new MqWorker(logWorker, producer, config.getBatchSize()));
         } catch (Exception ex) {
             this.close();
             throw ex;
@@ -74,8 +79,8 @@ class AppenderFacade implements Worker<Object> {
 
     @Override
     public void close() {
-        pulsarWorker.close();
+        mqWorker.close();
         logWorker.close();
-        fileQueueWorker.close();
+        fileWorker.close();
     }
 }

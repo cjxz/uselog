@@ -1,5 +1,7 @@
-package com.zmh.fastlog.producer;
+package com.zmh.fastlog.worker.mq.producer;
 
+import com.zmh.fastlog.model.event.ByteDisruptorEvent;
+import com.zmh.fastlog.model.event.ByteEvent;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.ByteBufferSerializer;
@@ -54,7 +56,7 @@ public class KafkaEventProducer implements MqEventProducer {
     }
 
     @Override
-    public void sendEvent(MqEvent event) {
+    public void sendEvent(ByteDisruptorEvent event) {
         ByteEvent byteEvent = event.getByteEvent();
         ProducerRecord<String, ByteBuffer> record = new ProducerRecord<>(topic, byteEvent.getBuffer());
 

@@ -1,14 +1,14 @@
-package com.zmh.fastlog.worker;
+package com.zmh.fastlog.worker.file;
 
-import com.zmh.fastlog.producer.ByteEvent;
+import com.zmh.fastlog.model.message.FileMqMessage;
+import com.zmh.fastlog.model.event.ByteEvent;
 import com.zmh.fastlog.utils.DateSequence;
 import com.zmh.fastlog.utils.ThreadUtils;
-import com.zmh.fastlog.worker.file.BytesCacheQueue;
+import com.zmh.fastlog.model.message.AbstractMqMessage;
 import lombok.SneakyThrows;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.commons.lang3.time.StopWatch;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.File;
@@ -26,7 +26,7 @@ public class FileWorkerTest {
     //@Ignore
     @Test
     public void test() {
-        try (FIFOFileQueue fifo = new FIFOFileQueue(64 * 1024 * 1024)) {
+        try (FIFOFileQueue fifo = new FIFOFileQueue(64 * 1024 * 1024, "logs/cache")) {
             StopWatch watch = new StopWatch();
             DateSequence seq = new DateSequence();
 
@@ -84,26 +84,26 @@ public class FileWorkerTest {
 
     @Test
     public void testFIFOFileQueuePutAndGet() {
-        try (FIFOFileQueue fifoFile = new FIFOFileQueue(1024)) {
+        try (FIFOFileQueue fifoFile = new FIFOFileQueue(1024, "logs/cache")) {
             DateSequence seq = new DateSequence();
 
             for (int i = 0; i < 7; i++) {
                 putToFile(128, fifoFile, (byte) (50 + i), seq.next());
             }
 
-            ByteMessage message = fifoFile.get();
+            AbstractMqMessage message = fifoFile.get();
             assertNotNull(message);
         }
     }
 
     @Test
     public void testFIFOFileQueuePutAndGetNum() {
-        try (FIFOFileQueue fifoFile = new FIFOFileQueue(32 * 1024 * 1024)) {
+        try (FIFOFileQueue fifoFile = new FIFOFileQueue(32 * 1024 * 1024, "logs/cache")) {
             DateSequence seq = new DateSequence();
 
             String text = "中文English123中文English123中文English123中文English123中文English123中文English123中文English123中文English123中文English123中文English123中文English123中文English123";
             byte[] bytes = text.getBytes();
-            ByteMessage message;
+            AbstractMqMessage message;
 
             int read = 0;
             for (int i = 0; i < 100; i++) {
@@ -172,7 +172,7 @@ public class FileWorkerTest {
         assertEquals(5 * (128 + 4 + 8), queue.getBytes().writerIndex());
 
         for (int i = 0; i < 5; i++) {
-            DataByteMessage message = queue.get();
+            FileMqMessage message = queue.get();
             assertNotNull(message);
         }
 
@@ -199,13 +199,13 @@ public class FileWorkerTest {
 
         //取7个
         for (int i = 0; i < 7; i++) {
-            DataByteMessage message = queue.get();
+            FileMqMessage message = queue.get();
             assertNotNull(message);
         }
         assertTrue(queue.isEmpty());
 
         //再取一个取不到，队列重置，又可以继续从头开始放了
-        DataByteMessage message = queue.get();
+        FileMqMessage message = queue.get();
         assertNull(message);
         assertEquals(0, queue.getBytes().readerIndex());
         assertEquals(0, queue.getBytes().writerIndex());
@@ -226,12 +226,12 @@ public class FileWorkerTest {
         assertFalse(head.isEmpty());
 
         for (int i = 0; i < 7; i++) {
-            DataByteMessage message = head.get();
+            FileMqMessage message = head.get();
             assertNotNull(message);
         }
         assertTrue(head.isEmpty());
 
-        DataByteMessage message = head.get();
+        FileMqMessage message = head.get();
         assertNull(message);
     }
 

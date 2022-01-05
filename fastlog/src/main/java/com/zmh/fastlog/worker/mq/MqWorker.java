@@ -1,11 +1,13 @@
-package com.zmh.fastlog.worker;
+package com.zmh.fastlog.worker.mq;
 
 import com.lmax.disruptor.*;
 import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
-import com.zmh.fastlog.producer.ByteEvent;
-import com.zmh.fastlog.producer.MqEvent;
-import com.zmh.fastlog.producer.MqEventProducer;
+import com.zmh.fastlog.worker.Worker;
+import com.zmh.fastlog.model.event.ByteDisruptorEvent;
+import com.zmh.fastlog.model.message.AbstractMqMessage;
+import com.zmh.fastlog.model.message.LastConfirmedSeq;
+import com.zmh.fastlog.worker.mq.producer.MqEventProducer;
 
 import java.util.concurrent.ScheduledFuture;
 
@@ -15,16 +17,16 @@ import static com.zmh.fastlog.utils.Utils.debugLog;
 import static java.lang.System.currentTimeMillis;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
-public class MqEventWorker implements Worker<Object>,
-    EventHandler<MqEvent>,
-    SequenceReportingEventHandler<MqEvent>,
+public class MqWorker implements Worker<AbstractMqMessage>,
+    EventHandler<ByteDisruptorEvent>,
+    SequenceReportingEventHandler<ByteDisruptorEvent>,
     BatchStartAware,
     TimeoutHandler {
 
     private final Worker<Object> logWorker;
 
-    private final Disruptor<MqEvent> queue;
-    private RingBuffer<MqEvent> ringBuffer;
+    private final Disruptor<ByteDisruptorEvent> queue;
+    private RingBuffer<ByteDisruptorEvent> ringBuffer;
 
     private final ScheduledFuture<?> connectFuture;
 
@@ -33,13 +35,13 @@ public class MqEventWorker implements Worker<Object>,
     private volatile boolean isDisposed = false;
     private final int batchSize;
 
-    public MqEventWorker(Worker<Object> logWorker, MqEventProducer producer, int batchSize) {
+    public MqWorker(Worker<Object> logWorker, MqEventProducer producer, int batchSize) {
         this.logWorker = logWorker;
         this.producer = producer;
         this.batchSize = batchSize;
 
         queue = new Disruptor<>(
-            MqEvent::new,
+            ByteDisruptorEvent::new,
             batchSize << 1,
             namedDaemonThreadFactory("log-mq-worker"),
             ProducerType.SINGLE,
@@ -59,13 +61,17 @@ public class MqEventWorker implements Worker<Object>,
         connectFuture.cancel(success);
     }
 
+    /**
+     * mq ring buffer 生产者
+     *
+     * @param message 入参有两种情况，同一时刻只能有一方会发来日志
+     *                1、从文件发过来的 FileMqMessage
+     *                2、直接从日志发过来的 LogDisruptorEvent
+     * @return true 日志发送成功 false 日志发送失败
+     */
     @Override
-    public boolean sendMessage(Object message) {
-        ByteMessage msg = (ByteMessage) message;
-        return !isDisposed && ringBuffer.tryPublishEvent((e, s) -> {
-            ByteEvent byteEvent = e.getByteEvent();
-            msg.apply(byteEvent);
-        });
+    public boolean sendMessage(AbstractMqMessage message) {
+        return !isDisposed && ringBuffer.tryPublishEvent((e, s) -> message.apply(e.getByteEvent()));
     }
 
     private long lastMessageId;
@@ -73,21 +79,13 @@ public class MqEventWorker implements Worker<Object>,
     private long messageCount;
 
     @Override
-    public void onEvent(MqEvent event, long sequence, boolean endOfBatch) {
-        ByteEvent byteEvent = event.getByteEvent();
-        long lastMessageId = byteEvent.getId();
-        //debugLog("receive event: " + lastMessageId + "," + endOfBatch + "," + event.getEventString());
+    public void onEvent(ByteDisruptorEvent event, long sequence, boolean endOfBatch) {
+        long lastMessageId = event.getByteEvent().getId();
+        producer.sendEvent(event);
 
-        int eventSize = byteEvent.getBufferLen();
-        if (eventSize > 1_000_000) {
-            debugLog("日志过大, 直接丢弃:" + event.getEventString());
-        } else {
-            producer.sendEvent(event);
-        }
         if (++batchIndex >= batchSize || endOfBatch) { //todo zmh
             producer.flush();
             sequenceCallback.set(sequence);
-            //debugLog("mq size:" + (ringBuffer.getCursor() - sequence));
             batchIndex = 0;
         }
         if (endOfBatch) {
@@ -107,8 +105,7 @@ public class MqEventWorker implements Worker<Object>,
         }
         if (lastSendSeqId != lastMessageId || (nextSendSeqTime < currentTimeMillis())) {
             final long l = currentTimeMillis();
-            //debugLog("mq sync seq:" + lastMessageId + "," + l);
-            logWorker.sendMessage(new LastSeq(lastMessageId));
+            logWorker.sendMessage(new LastConfirmedSeq(lastMessageId));
             nextSendSeqTime = l + 1000;
             lastSendSeqId = sequence;
         }
@@ -122,7 +119,7 @@ public class MqEventWorker implements Worker<Object>,
         try {
             queue.shutdown(60, SECONDS);
         } catch (TimeoutException e) {
-            debugLog("pulsar close timeout, force close!");
+            debugLog("mq close timeout, force close!");
             queue.halt();
         }
         producer.close();
