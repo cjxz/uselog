@@ -61,7 +61,7 @@ public class FileWorker implements Worker<LogDisruptorEvent>, EventHandler<ByteD
     public void onTimeout(long sequence) {
         AbstractMqMessage message;
         while (ringBuffer.getCursor() - sequence <= HIGH_WATER_LEVEL_FILE && nonNull(message = fifo.get())) {
-            if (isClose || !mqWorker.sendMessage(message)) {  //todo zmh 这里得比后续Kafka后加载，避免大量日志发出去报错。
+            if (isClose || !mqWorker.sendMessage(message)) {
                 return;
             }
             fifo.next();

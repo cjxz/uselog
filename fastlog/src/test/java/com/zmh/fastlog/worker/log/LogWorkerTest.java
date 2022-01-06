@@ -45,7 +45,7 @@ public class LogWorkerTest {
         when(mqWorker.sendMessage(any())).thenReturn(true);
         Worker<LogDisruptorEvent> fileWorker = mock(Worker.class);
 
-        try (LogWorker logWorker = new LogWorker(mqWorker, fileWorker, 1024, 65536, "cut")) {
+        try (LogWorker logWorker = new LogWorker(mqWorker, fileWorker, 1024, 1024)) {
             when(fileWorker.sendMessage(any()))
                 .thenAnswer(msg -> {
                     System.out.println("send message:" + msg.getArgument(0));
@@ -87,7 +87,7 @@ public class LogWorkerTest {
         Worker<LogDisruptorEvent> fileWorker = mock(Worker.class);
         when(fileWorker.sendMessage(any())).thenReturn(true);
 
-        try (LogWorker logWorker = new LogWorker(mqWorker, fileWorker, 1024, 65536, "cut")) {
+        try (LogWorker logWorker = new LogWorker(mqWorker, fileWorker, 1024, 1024)) {
             writeField(logWorker, "directWriteToMq", true, true);
 
             for (int i = 0; i < logWorker.getHighWaterLevelMq(); i++) {
@@ -116,7 +116,7 @@ public class LogWorkerTest {
         Worker<LogDisruptorEvent> fileWorker = mock(Worker.class);
         when(fileWorker.sendMessage(any())).thenReturn(false);
 
-        try (LogWorker logWorker = new LogWorker(mqWorker, fileWorker, 1024, 65536, "cut")) {
+        try (LogWorker logWorker = new LogWorker(mqWorker, fileWorker, 1024, 1024)) {
             writeField(logWorker, "directWriteToMq", true, true);
 
             for (int i = 0; i < logWorker.getHighWaterLevelFile(); i++) {

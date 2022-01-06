@@ -1,9 +1,8 @@
 package com.zmh.fastlog.worker.file;
 
-import com.zmh.fastlog.model.message.FileMqMessage;
 import com.zmh.fastlog.model.event.ByteEvent;
-import com.zmh.fastlog.utils.Utils;
 import com.zmh.fastlog.model.message.AbstractMqMessage;
+import com.zmh.fastlog.model.message.FileMqMessage;
 import io.appulse.utils.Bytes;
 import io.appulse.utils.ReadBytesUtils;
 import io.appulse.utils.WriteBytesUtils;
@@ -24,6 +23,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static com.zmh.fastlog.utils.BufferUtils.marginToBuffer;
+import static com.zmh.fastlog.utils.Utils.debugLog;
 import static java.util.Comparator.comparing;
 import static java.util.Locale.ENGLISH;
 import static java.util.Objects.isNull;
@@ -202,7 +202,9 @@ class BytesCacheQueue {
 
             return new FileMqMessage(id, readBuffer, readCount);
         } else {
-            return null; //todo zmh throw exception
+            debugLog("fast log BytesCacheQueue readCount error " + readCount);
+            this.bytes.reset();
+            return null;
         }
     }
 
@@ -312,7 +314,7 @@ class LogFiles implements AutoCloseable {
                 }
                 return;
             } catch (Exception ex) {
-                Utils.debugLog("read data error " + ex);
+                debugLog("read data error " + ex);
                 files.remove(file);
             }
         } while (true);

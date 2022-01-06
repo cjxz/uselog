@@ -56,7 +56,7 @@ class AppenderFacade implements Worker<Object> {
         try {
             fileWorker.setDelegate(new FileWorker(mqWorker, config.getFileMemoryCacheSize(), config.getFileCacheFolder()));
 
-            logWorker.setDelegate(new LogWorker(mqWorker, fileWorker, config.getBatchSize(), config.getLogMaxSize(), config.getLargeLogHandlerType()));
+            logWorker.setDelegate(new LogWorker(mqWorker, fileWorker, config.getBatchSize(), config.getMaxMsgSize()));
 
             MqProducer producer = null;
             if ("kafka".equals(config.getType())) {

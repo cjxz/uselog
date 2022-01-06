@@ -9,9 +9,7 @@
     <springProperty scope="context" name="kafkaPartition" source="fastlog.kafkaPartition" defaultValue="4"/>
     <springProperty scope="context" name="fileCacheFolder" source="fastlog.fileCacheFolder" defaultValue="logs/cache"/>
     <springProperty scope="context" name="fileMemoryCacheSize" source="fastlog.fileMemoryCacheSize" defaultValue="67108864"/>
-    <springProperty scope="context" name="logMaxSize" source="fastlog.logMaxSize" defaultValue="65536"/>
-    <springProperty scope="context" name="largeLogHandlerType" source="fastlog.largeLogHandlerType" defaultValue="discard"/>
-
+    <springProperty scope="context" name="maxMsgSize" source="fastlog.maxMsgSize" defaultValue="10240"/>
 
     <appender name="FAST_LOG" class="com.zmh.fastlog.FastLogAppender">
         <config>
@@ -23,8 +21,7 @@
             <kafkaPartition>${kafkaPartition}</kafkaPartition>
             <fileCacheFolder>${fileCacheFolder}</fileCacheFolder>
             <fileMemoryCacheSize>${fileMemoryCacheSize}</fileMemoryCacheSize>
-            <logMaxSize>${logMaxSize}</logMaxSize>
-            <largeLogHandlerType>${largeLogHandlerType}</largeLogHandlerType>
+            <maxMsgSize>${maxMsgSize}</maxMsgSize>
         </config>
     </appender>
 

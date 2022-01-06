@@ -82,4 +82,14 @@ public class JsonByteBuilderTest { //todo zmh 加一个ensure的单元测试
             .toString();
         assertEquals("{\"the中文key\":\"enn.中文..value\"}", json);
     }
+
+    @Test
+    public void testCut() {
+        String json = JsonByteBuilder.create()
+            .beginObject()
+            .key("key").value("valuevalue中文", 11)
+            .endObject()
+            .toString();
+        assertEquals("{\"key\":\"valuevalue中\"}", json);
+    }
 }

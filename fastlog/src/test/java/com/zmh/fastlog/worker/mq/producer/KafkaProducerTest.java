@@ -10,7 +10,5 @@ public class KafkaProducerTest {
             producer.connect();
             System.out.println(producer.heartbeat());
         }
-
-
     }
 }

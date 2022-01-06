@@ -12,8 +12,7 @@ public class FastLogConfig {
     private int kafkaPartition;
     private String fileCacheFolder;
     private int fileMemoryCacheSize; //bytes 单位：字节
-    private int logMaxSize; //一条最多能占用多少字节，多于这个数量 截取或者丢弃
-    private String largeLogHandlerType; // cut截取 discard丢弃
+    private int maxMsgSize; //日志的message最多能占用多少字符，多于这个数量截取 单位：字符
 
     public int getBatchSize() {
         if ("kafka".equals(type)) {

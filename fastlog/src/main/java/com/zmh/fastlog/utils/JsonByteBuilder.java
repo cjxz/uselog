@@ -41,7 +41,7 @@ public class JsonByteBuilder {
 
     private void markFirstKey() {
         if (isObject() && !isFirstKey()) {
-            bufferArray[pos++] = ',';
+            comma();
         }
         firstKey[firstElementPos] = false;
     }
@@ -104,8 +104,8 @@ public class JsonByteBuilder {
 
             additionLength += Math.min(additionLength, pos);
             additionLength = marginToBuffer(additionLength);
-            bufferArray = new byte[additionLength];
 
+            bufferArray = new byte[additionLength];
             System.arraycopy(src, 0, bufferArray, 0, pos);
         }
     }
@@ -120,18 +120,20 @@ public class JsonByteBuilder {
     private final static byte[] HEX_BYTE = {48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 65, 66, 67, 68, 69, 70};
 
     private void writeString(String str) {
-        int sLength = str.length();
+        writeString(str, str.length());
+    }
 
+    private void writeString(String str, int length) {
         byte[] arr = this.bufferArray;
         int pos = this.pos;
 
-        int len = sLength << 2;
+        int len = length << 2;
         if (arr.length - pos < len) {
             ensureCapacity(len);
             arr = this.bufferArray;
         }
 
-        for (int sIndex = 0; sIndex < sLength; sIndex++) {
+        for (int sIndex = 0; sIndex < length; sIndex++) {
             char c = str.charAt(sIndex);
 
             if (c < '\u0080') {
@@ -161,7 +163,7 @@ public class JsonByteBuilder {
                 arr[pos++] = (byte) (128 | c & 63);
             } else {
                 int cp = 0;
-                if (++sIndex < sLength) cp = Character.toCodePoint(c, str.charAt(sIndex));
+                if (++sIndex < length) cp = Character.toCodePoint(c, str.charAt(sIndex));
                 if ((cp >= 1 << 16) && (cp < 1 << 21)) {
                     arr[pos++] = (byte) (240 | cp >>> 18);
                     arr[pos++] = (byte) (128 | cp >>> 12 & 63);
@@ -229,12 +231,16 @@ public class JsonByteBuilder {
     }
 
     public JsonByteBuilder value(String value) {
+        return value(value, value.length());
+    }
+
+    public JsonByteBuilder value(String value, int length) {
         markFirstValue();
         if (isNull(value)) {
             writeString("null");
         } else {
             addAscii((byte) '"');
-            writeString(value);
+            writeString(value, length);
             addAscii((byte) '"');
         }
         return this;

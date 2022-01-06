@@ -66,12 +66,10 @@ public class LogWorker implements Worker<Object>,
     private boolean directWriteToMq = false;
     private final Worker<AbstractMqMessage> mqWorker;
     private final Worker<LogDisruptorEvent> fileWorker;
-    private final int logMaxSize; //todo zmh
-    private final String largeLogHandlerType;
+    private final int maxMsgSize;
 
-    public LogWorker(Worker<AbstractMqMessage> mqWorker, Worker<LogDisruptorEvent> fileWorker, int batchSize, int logMaxSize, String largeLogHandlerType) {
-        this.logMaxSize = logMaxSize;
-        this.largeLogHandlerType = largeLogHandlerType;
+    public LogWorker(Worker<AbstractMqMessage> mqWorker, Worker<LogDisruptorEvent> fileWorker, int batchSize, int maxMsgSize) {
+        this.maxMsgSize = maxMsgSize;
 
         this.mqWorker = mqWorker;
         this.fileWorker = fileWorker;
@@ -206,7 +204,7 @@ public class LogWorker implements Worker<Object>,
         jsonByteBuilder.clear()
             .beginObject()
             .key(DATA_SEQ).value(dataSeq.next())
-            .key(DATA_MESSAGE).value(log.getFormattedMessage())
+            .key(DATA_MESSAGE).value(log.getFormattedMessage(), maxMsgSize)
             .key(DATA_LOGGER).value(log.getLoggerName())
             .key(DATA_THREAD).value(log.getThreadName())
             .key(DATA_LEVEL).value(log.getLevel().levelStr);
