@@ -12,10 +12,8 @@ import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.Future;
-import java.util.concurrent.atomic.LongAdder;
 
 import static com.zmh.fastlog.utils.Utils.*;
-import static com.zmh.fastlog.utils.Utils.debugLog;
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.lang3.StringUtils.isBlank;
@@ -31,7 +29,7 @@ public class KafkaProducer implements MqProducer {
     private final int batchMessageSize;
 
     private long totalMissingCount = 0;
-    private final LongAdder kafkaMissingCount = new LongAdder();
+    private int kafkaMissingCount = 0;
 
     public KafkaProducer(String url, String topic, int batchMessageSize) {
         if (isNotBlank(topic)) {
@@ -70,7 +68,7 @@ public class KafkaProducer implements MqProducer {
         producer.send(record, (metadata, e) -> {
             if (nonNull(e)) {
                 debugLog("fastlog kafka sendEvent fail, e:" + e.getMessage());
-                kafkaMissingCount.increment();
+                kafkaMissingCount++;
             } else {
                 event.clear();
             }
@@ -78,11 +76,11 @@ public class KafkaProducer implements MqProducer {
     }
 
     public boolean hasMissedMsg() {
-        long sum = kafkaMissingCount.sumThenReset();
-        boolean result = sum > 0;
+        boolean result = kafkaMissingCount > 0;
         if (result) {
-            totalMissingCount += sum;
-            debugLog("fastlog kafka mission count:" + sum + ", total:" + totalMissingCount);
+            totalMissingCount += kafkaMissingCount;
+            debugLog("fastlog kafka mission count:" + kafkaMissingCount + ", total:" + totalMissingCount);
+            kafkaMissingCount = 0;
         }
         return result;
     }

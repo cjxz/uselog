@@ -30,71 +30,103 @@ public class JsonByteBuilder {
     private byte[] bufferArray;
     private int pos;
 
-    private boolean[] firstKey = new boolean[10];
-    private boolean[] firstValue = new boolean[10];
-    private boolean[] isObject = new boolean[10];
-    private int firstElementPos = -1;
-
-    public int capacity() {
-        return bufferArray.length;
-    }
-
-    private void markFirstKey() {
-        if (isObject() && !isFirstKey()) {
-            comma();
-        }
-        firstKey[firstElementPos] = false;
-    }
-
-    private void markFirstValue() {
-        if (isArray() && !isFirstValue()) {
-            comma();
-        }
-        firstValue[firstElementPos] = false;
-    }
-
-    private boolean isFirstKey() {
-        return firstKey[firstElementPos];
-    }
-
-    private boolean isFirstValue() {
-        return firstValue[firstElementPos];
-    }
-
-    private boolean isObject() {
-        return isObject[firstElementPos];
-    }
-
-    private boolean isArray() {
-        return !isObject();
-    }
-
-    public static JsonByteBuilder create() {
-        return new JsonByteBuilder();
-    }
-
     public static JsonByteBuilder create(int bufferLen) {
         return new JsonByteBuilder(bufferLen);
-    }
-
-
-    public JsonByteBuilder clear() {
-        this.firstElementPos = -1;
-        this.bufferArray = new byte[256];
-
-        this.pos = 0;
-        return this;
-    }
-
-    private JsonByteBuilder() {
-        clear();
     }
 
     private JsonByteBuilder(int bufferLen) {
         bufferLen = marginToBuffer(bufferLen);
         this.bufferArray = new byte[bufferLen];
         this.pos = 0;
-        clear();
+    }
+
+    public JsonByteBuilder beginObject() {
+        addAscii((byte) '{');
+        return this;
+    }
+
+    public JsonByteBuilder endObject() {
+        removeRedundantComma();
+        addAscii((byte) '}');
+        return this;
+    }
+
+    public JsonByteBuilder key(@NonNull String key) {
+        int len = key.length() << 2;
+        if (this.bufferArray.length - this.pos < len) {
+            ensureCapacity(len);
+        }
+        addAscii((byte) '"');
+        writeString(key);
+        addAscii((byte) '"');
+        addAscii((byte) ':');
+        return this;
+    }
+
+    public JsonByteBuilder value(String value) {
+        if (isNull(value)) {
+            writeString("null");
+            addAscii((byte) ',');
+            return this;
+        }
+        return value(value, value.length());
+    }
+
+    public JsonByteBuilder value(String value, int maxLength) {
+        if (isNull(value)) {
+            writeString("null");
+            addAscii((byte) ',');
+        } else {
+            addAscii((byte) '"');
+            writeString(value, Math.min(value.length(), maxLength));
+            addAscii((byte) '"');
+            addAscii((byte) ',');
+        }
+        return this;
+    }
+
+    public JsonByteBuilder value(long value) {
+        byte[] arr = this.bufferArray;
+        int pos = this.pos;
+        if (pos + 20 > arr.length) {
+            ensureCapacity(20);
+            arr = this.bufferArray;
+        }
+        if (0 == value) {
+            arr[pos++] = 48; // 48 = 0
+            this.pos = pos;
+            return this;
+        }
+        if (value < 0) {
+            arr[pos++] = 45; // 45 = -
+            value = -value;
+        }
+        int begin = pos;
+        while (value > 0) {
+            int n = (int) (value % 10);
+            value /= 10;
+            arr[pos++] = (byte) (n | 0x30);
+        }
+        this.pos = pos;
+        int end = pos - 1;
+        while (begin < end) {
+            byte t = arr[begin];
+            arr[begin] = arr[end];
+            arr[end] = t;
+            begin++;
+            end--;
+        }
+        addAscii((byte) ',');
+        return this;
+    }
+
+    public int capacity() {
+        return bufferArray.length;
+    }
+
+    public JsonByteBuilder clear() {
+        this.pos = 0;
+        return this;
     }
 
     private void ensureCapacity(int length) {
@@ -177,124 +209,10 @@ public class JsonByteBuilder {
         this.pos = pos;
     }
 
-    public JsonByteBuilder beginObject() {
-        if (firstElementPos >= 0 && isArray()) {
-            if (isFirstKey()) {
-                firstKey[firstElementPos] = false;
-                firstValue[firstElementPos] = false;
-            } else {
-                comma();
-            }
+    private void removeRedundantComma() {
+        if (bufferArray[pos - 1] == 44) {
+            pos--;
         }
-        firstKey[++firstElementPos] = true;
-        firstValue[firstElementPos] = true;
-        isObject[firstElementPos] = true;
-        addAscii((byte) '{');
-        return this;
-    }
-
-    public JsonByteBuilder endObject() {
-        firstElementPos--;
-        addAscii((byte) '}');
-        return this;
-    }
-
-    public JsonByteBuilder beginArray() {
-        firstKey[++firstElementPos] = true;
-        firstValue[firstElementPos] = true;
-        isObject[firstElementPos] = false;
-        addAscii((byte) '[');
-        return this;
-    }
-
-    public JsonByteBuilder endArray() {
-        firstElementPos--;
-        addAscii((byte) ']');
-        return this;
-    }
-
-    private void comma() {
-        addAscii((byte) ',');
-    }
-
-    public JsonByteBuilder key(@NonNull String key) {
-        int len = key.length() << 2;
-        if (this.bufferArray.length - this.pos < len) {
-            ensureCapacity(len);
-        }
-        markFirstKey();
-        addAscii((byte) '"');
-        writeString(key);
-        addAscii((byte) '"');
-        addAscii((byte) ':');
-        return this;
-    }
-
-    public JsonByteBuilder value(String value) {
-        return value(value, value.length());
-    }
-
-    public JsonByteBuilder value(String value, int length) {
-        markFirstValue();
-        if (isNull(value)) {
-            writeString("null");
-        } else {
-            addAscii((byte) '"');
-            writeString(value, length);
-            addAscii((byte) '"');
-        }
-        return this;
-    }
-
-    public JsonByteBuilder value(long value) {
-        markFirstValue();
-        byte[] arr = this.bufferArray;
-        int pos = this.pos;
-        if (pos + 20 > arr.length) {
-            ensureCapacity(20);
-            arr = this.bufferArray;
-        }
-        if (0 == value) {
-            arr[pos++] = 48; // 48 = 0
-            this.pos = pos;
-            return this;
-        }
-        if (value < 0) {
-            arr[pos++] = 45; // 45 = -
-            value = -value;
-        }
-        int begin = pos;
-        while (value > 0) {
-            int n = (int) (value % 10);
-            value /= 10;
-            arr[pos++] = (byte) (n | 0x30);
-        }
-        this.pos = pos;
-        int end = pos - 1;
-        while (begin < end) {
-            byte t = arr[begin];
-            arr[begin] = arr[end];
-            arr[end] = t;
-            begin++;
-            end--;
-        }
-        return this;
-    }
-
-    public JsonByteBuilder object(String key, String value) {
-        return beginObject().key(key).value(value).endObject();
-    }
-
-    public JsonByteBuilder object(String key, long value) {
-        return beginObject().key(key).value(value).endObject();
-    }
-
-    public JsonByteBuilder kv(String key, String v) {
-        return key(key).value(v);
-    }
-
-    public JsonByteBuilder kv(String key, long v) {
-        return key(key).value(v);
     }
 
     public String toString() {

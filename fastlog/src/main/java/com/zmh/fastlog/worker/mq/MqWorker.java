@@ -103,19 +103,23 @@ public class MqWorker implements Worker<AbstractMqMessage>,
     @Override
     public void onTimeout(long sequence) {
         if (sequence < 0) {
-            if (!isReady && producer.heartbeat()) {
-                isReady = true;
-            }
+            checkHeartbeat();
             return;
         }
         sendSeqMsg(sequence);
+        checkHeartbeat();
+    }
+
+    private void checkHeartbeat() {
         if (!isReady && producer.heartbeat()) {
+            debugLog("fastlog mq heartbeat success, isReady true");
             isReady = true;
         }
     }
 
     private void sendSeqMsg(long sequence) {
         if (producer.hasMissedMsg()) {
+            debugLog("fastlog mq missed msg, isReady false");
             isReady = false;
         }
         if (lastSendSeqId != lastMessageId || (nextSendSeqTime < currentTimeMillis())) {
