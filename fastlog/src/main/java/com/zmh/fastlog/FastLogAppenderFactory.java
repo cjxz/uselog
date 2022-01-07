@@ -56,15 +56,15 @@ class AppenderFacade implements Worker<Object> {
         try {
             fileWorker.setDelegate(new FileWorker(mqWorker, config.getFileMemoryCacheSize(), config.getFileCacheFolder()));
 
-            logWorker.setDelegate(new LogWorker(mqWorker, fileWorker, config.getBatchSize(), config.getMaxMsgSize()));
+            logWorker.setDelegate(new LogWorker(mqWorker, fileWorker, config.getBatchMessageSize(), config.getMaxMsgSize()));
 
             MqProducer producer = null;
             if ("kafka".equals(config.getType())) {
-                producer = new KafkaProducer(config.getUrl(), config.getTopic(), config.getLogBatchHandlerSize());
+                producer = new KafkaProducer(config.getUrl(), config.getTopic(), config.getBatchSize());
             } else if ("pulsar".equals(config.getType())) {
-                producer = new PulsarProducer(config.getUrl(), config.getTopic(), config.getLogBatchHandlerSize());
+                producer = new PulsarProducer(config.getUrl(), config.getTopic(), config.getBatchSize());
             }
-            mqWorker.setDelegate(new MqWorker(logWorker, producer, config.getBatchSize()));
+            mqWorker.setDelegate(new MqWorker(logWorker, producer, config.getBatchMessageSize()));
         } catch (Exception ex) {
             this.close();
             throw ex;

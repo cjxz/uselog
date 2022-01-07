@@ -45,7 +45,7 @@ public class MqWorker implements Worker<AbstractMqMessage>,
 
         queue = new Disruptor<>(
             ByteDisruptorEvent::new,
-            batchSize << 1,
+            batchSize << 2,
             namedDaemonThreadFactory("log-mq-worker"),
             ProducerType.SINGLE,
             new LiteTimeoutBlockingWaitStrategy(1, SECONDS)
@@ -83,6 +83,9 @@ public class MqWorker implements Worker<AbstractMqMessage>,
     @Override
     public void onEvent(ByteDisruptorEvent event, long sequence, boolean endOfBatch) {
         long lastMessageId = event.getByteEvent().getId();
+        if (lastMessageId == 0L) {
+            System.out.println("lastMessageId " + lastMessageId);
+        }
         producer.sendEvent(event);
 
         if (++batchIndex >= batchSize || endOfBatch) { //todo zmh

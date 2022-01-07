@@ -7,7 +7,7 @@ public class FastLogConfig {
     private String url;
     private String topic;
     private boolean enable;
-    private int logBatchHandlerSize; //一批处理多少条日志
+    private int batchMessageSize; //一批处理多少条日志
     private String type; //kafka pulsar
     private int kafkaPartition;
     private String fileCacheFolder;
@@ -16,9 +16,14 @@ public class FastLogConfig {
 
     public int getBatchSize() {
         if ("kafka".equals(type)) {
-            return logBatchHandlerSize * kafkaPartition;
+            int size = batchMessageSize * Math.min(maxMsgSize, 512); //512是根据经验预估的一条日志的平均大小
+
+            if (size * kafkaPartition < 10 * 1024 * 1024) {
+                return size;
+            }
+            return 10 * 1024 * 1024 / kafkaPartition;
         } else {
-            return logBatchHandlerSize;
+            return batchMessageSize;
         }
     }
 }

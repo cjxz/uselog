@@ -8,6 +8,7 @@ import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.impl.TypedMessageBuilderImpl;
 
+import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.LongAdder;
 
 import static com.zmh.fastlog.utils.Utils.*;
@@ -81,10 +82,9 @@ public class PulsarProducer implements MqProducer {
     public void sendEvent(ByteDisruptorEvent event) {
         TypedMessageBuilderImpl<byte[]> pulsarMessage = (TypedMessageBuilderImpl<byte[]>) producer.newMessage();
 
-        int eventSize = event.getByteEvent().getBufferLen();
-
-        pulsarMessage.value(event.getByteEvent().getBuffer().array());
-        pulsarMessage.getContent().limit(eventSize);
+        ByteBuffer buffer = event.getByteEvent().getBuffer();
+        pulsarMessage.value(buffer.array());
+        pulsarMessage.getContent().limit(buffer.position());
 
         pulsarMessage.sendAsync()
             .exceptionally(e -> {

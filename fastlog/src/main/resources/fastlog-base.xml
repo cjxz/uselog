@@ -5,7 +5,7 @@
     <springProperty scope="context" name="url" source="fastlog.url" defaultValue="localhost:9092"/>
     <springProperty scope="context" name="topic" source="fastlog.topic" defaultValue="log"/>
     <springProperty scope="context" name="type" source="fastlog.type" defaultValue="kafka"/>
-    <springProperty scope="context" name="logBatchHandlerSize" source="fastlog.logBatchHandlerSize" defaultValue="128"/>
+    <springProperty scope="context" name="batchMessageSize" source="fastlog.batchMessageSize" defaultValue="128"/>
     <springProperty scope="context" name="kafkaPartition" source="fastlog.kafkaPartition" defaultValue="4"/>
     <springProperty scope="context" name="fileCacheFolder" source="fastlog.fileCacheFolder" defaultValue="logs/cache"/>
     <springProperty scope="context" name="fileMemoryCacheSize" source="fastlog.fileMemoryCacheSize" defaultValue="67108864"/>
@@ -16,7 +16,7 @@
             <enable>${enable}</enable>
             <url>${url}</url>
             <topic>${topic}</topic>
-            <logBatchHandlerSize>${logBatchHandlerSize}</logBatchHandlerSize>
+            <batchMessageSize>${batchMessageSize}</batchMessageSize>
             <type>${type}</type>
             <kafkaPartition>${kafkaPartition}</kafkaPartition>
             <fileCacheFolder>${fileCacheFolder}</fileCacheFolder>

@@ -76,7 +76,7 @@ public class LogWorker implements Worker<Object>,
         // 缓冲区设置
         // 初始的缓冲池, 避免短期内日志突然增多造成日志来不及处理而丢失
         // 本实例是日志的入口, 尽量通过缓冲区把各个线程的日志的平缓的收集过来
-        int bufferSize = batchSize << 2;
+        int bufferSize = batchSize << 4;
         this.highWaterLevelFile = (int) (bufferSize * 0.75);
         this.highWaterLevelMq = bufferSize >> 1;
 

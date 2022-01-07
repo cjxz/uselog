@@ -2,8 +2,6 @@ package com.zmh.fastlog.utils;
 
 import lombok.NonNull;
 
-import java.nio.ByteBuffer;
-
 import static com.zmh.fastlog.utils.BufferUtils.marginToBuffer;
 import static java.util.Objects.isNull;
 
@@ -124,6 +122,14 @@ public class JsonByteBuilder {
         return bufferArray.length;
     }
 
+    public int pos() {
+        return pos;
+    }
+
+    public byte[] array() {
+        return bufferArray;
+    }
+
     public JsonByteBuilder clear() {
         this.pos = 0;
         return this;
@@ -217,24 +223,5 @@ public class JsonByteBuilder {
 
     public String toString() {
         return new String(bufferArray, 0, pos);
-    }
-
-    private static final ByteBuffer EMPTY_BYTE_BUFFER = ByteBuffer.allocate(0);
-
-    public ByteBuffer toByteBuffer(ByteBuffer bb) {
-        if (isNull(bb)) {
-            bb = EMPTY_BYTE_BUFFER;
-        }
-        ByteBuffer result = bb;
-        if (bb.remaining() < pos) {
-            int len = bb.position() + pos;
-            len = marginToBuffer(len);
-            byte[] arr = new byte[len];
-            System.arraycopy(bb.array(), 0, arr, 0, bb.capacity());
-            result = ByteBuffer.wrap(arr);
-            result.position(bb.position());
-        }
-        result.put(bufferArray, 0, pos);
-        return result;
     }
 }

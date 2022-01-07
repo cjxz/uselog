@@ -21,7 +21,7 @@ public class FileWorker implements Worker<LogDisruptorEvent>, EventHandler<ByteD
     private final Disruptor<ByteDisruptorEvent> queue;
     private final RingBuffer<ByteDisruptorEvent> ringBuffer;
     private final FIFOQueue fifo;
-    private static final int BUFFER_SIZE = 2048;
+    private static final int BUFFER_SIZE = 512;
     private static final int HIGH_WATER_LEVEL_FILE = BUFFER_SIZE >> 1;
 
     private volatile boolean isClose;
@@ -33,7 +33,7 @@ public class FileWorker implements Worker<LogDisruptorEvent>, EventHandler<ByteD
         queue = new Disruptor<>(
             ByteDisruptorEvent::new,
             BUFFER_SIZE,
-            namedDaemonThreadFactory("log-filequeue-worker"),
+            namedDaemonThreadFactory("log-file-worker"),
             ProducerType.SINGLE,
             new LiteTimeoutBlockingWaitStrategy(100, MILLISECONDS)
         );
