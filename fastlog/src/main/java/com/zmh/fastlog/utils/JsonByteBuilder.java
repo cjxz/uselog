@@ -2,7 +2,7 @@ package com.zmh.fastlog.utils;
 
 import lombok.NonNull;
 
-import static com.zmh.fastlog.utils.BufferUtils.marginToBuffer;
+import static com.zmh.fastlog.utils.Utils.marginToBuffer;
 import static java.util.Objects.isNull;
 
 public class JsonByteBuilder {

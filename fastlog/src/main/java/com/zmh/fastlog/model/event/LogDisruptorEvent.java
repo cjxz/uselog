@@ -9,7 +9,7 @@ import lombok.ToString;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 
-import static com.zmh.fastlog.utils.BufferUtils.marginToBuffer;
+import static com.zmh.fastlog.utils.Utils.marginToBuffer;
 
 @Data
 @EqualsAndHashCode(callSuper = true)

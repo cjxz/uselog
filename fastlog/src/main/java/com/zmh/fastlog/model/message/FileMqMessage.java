@@ -6,7 +6,7 @@ import lombok.EqualsAndHashCode;
 
 import java.nio.ByteBuffer;
 
-import static com.zmh.fastlog.utils.BufferUtils.marginToBuffer;
+import static com.zmh.fastlog.utils.Utils.marginToBuffer;
 import static java.util.Objects.isNull;
 
 @EqualsAndHashCode(callSuper = true)

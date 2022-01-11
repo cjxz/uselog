@@ -22,8 +22,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static com.zmh.fastlog.utils.BufferUtils.marginToBuffer;
 import static com.zmh.fastlog.utils.Utils.debugLog;
+import static com.zmh.fastlog.utils.Utils.marginToBuffer;
 import static java.util.Comparator.comparing;
 import static java.util.Locale.ENGLISH;
 import static java.util.Objects.isNull;

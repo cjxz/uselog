@@ -10,6 +10,7 @@ import com.zmh.fastlog.worker.Worker;
 import com.zmh.fastlog.worker.mq.producer.MqProducer;
 import lombok.SneakyThrows;
 
+import java.nio.ByteBuffer;
 import java.util.concurrent.ScheduledFuture;
 
 import static com.zmh.fastlog.utils.ScheduleUtils.scheduleWithFixedDelay;
@@ -82,11 +83,15 @@ public class MqWorker implements Worker<AbstractMqMessage>,
 
     @Override
     public void onEvent(ByteDisruptorEvent event, long sequence, boolean endOfBatch) {
-        long lastMessageId = event.getByteEvent().getId();
-        if (lastMessageId == 0L) {
-            System.out.println("lastMessageId " + lastMessageId);
-        }
-        producer.sendEvent(event);
+        long processMessageId = event.getByteEvent().getId();
+        ByteBuffer buffer = event.getByteEvent().getBuffer();
+        System.out.println("lastMessageId " + processMessageId + " position " + buffer.position() + " limit" + buffer.limit() + " size" + buffer.capacity());
+
+        /*if (processMessageId == 0L) {
+            ByteBuffer buffer = event.getByteEvent().getBuffer();
+            System.out.println("lastMessageId " + processMessageId + " position " + buffer.position() + " limit" + buffer.limit() + " size" + buffer.capacity());
+        }*/
+        //producer.sendEvent(event);
 
         if (++batchIndex >= batchSize || endOfBatch) { //todo zmh
             producer.flush();
@@ -94,7 +99,7 @@ public class MqWorker implements Worker<AbstractMqMessage>,
             batchIndex = 0;
         }
         if (endOfBatch) {
-            this.lastMessageId = lastMessageId;
+            this.lastMessageId = processMessageId;
             sendSeqMsg(lastMessageId);
         }
         messageCount++;
