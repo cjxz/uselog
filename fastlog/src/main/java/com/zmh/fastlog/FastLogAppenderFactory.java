@@ -1,12 +1,11 @@
 package com.zmh.fastlog;
 
 import com.zmh.fastlog.config.FastLogConfig;
-
-import com.zmh.fastlog.worker.*;
-import com.zmh.fastlog.worker.file.FileWorker;
-import com.zmh.fastlog.worker.log.LogWorker;
 import com.zmh.fastlog.model.event.LogDisruptorEvent;
 import com.zmh.fastlog.model.message.AbstractMqMessage;
+import com.zmh.fastlog.worker.Worker;
+import com.zmh.fastlog.worker.file.FileWorker;
+import com.zmh.fastlog.worker.log.LogWorker;
 import com.zmh.fastlog.worker.mq.MqWorker;
 import com.zmh.fastlog.worker.mq.producer.KafkaProducer;
 import com.zmh.fastlog.worker.mq.producer.MqProducer;
@@ -54,15 +53,15 @@ class AppenderFacade implements Worker<Object> {
 
     public AppenderFacade(FastLogConfig config) {
         try {
-            fileWorker.setDelegate(new FileWorker(mqWorker, config.getFileMemoryCacheSize(), config.getFileCacheFolder()));
+            fileWorker.setDelegate(new FileWorker(mqWorker, config.getFileMemoryCacheSize(), config.getMaxFileCount(), config.getFileCacheFolder()));
 
             logWorker.setDelegate(new LogWorker(mqWorker, fileWorker, config.getBatchMessageSize(), config.getMaxMsgSize()));
 
-            MqProducer producer = null;
-            if ("kafka".equals(config.getType())) {
-                producer = new KafkaProducer(config.getUrl(), config.getTopic(), config.getBatchSize());
-            } else if ("pulsar".equals(config.getType())) {
+            MqProducer producer;
+            if ("pulsar".equals(config.getMqType())) {
                 producer = new PulsarProducer(config.getUrl(), config.getTopic(), config.getBatchSize());
+            } else {
+                producer = new KafkaProducer(config.getUrl(), config.getTopic(), config.getBatchSize());
             }
             mqWorker.setDelegate(new MqWorker(logWorker, producer, config.getBatchMessageSize()));
         } catch (Exception ex) {

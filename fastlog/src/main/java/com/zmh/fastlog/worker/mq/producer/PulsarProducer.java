@@ -2,15 +2,15 @@ package com.zmh.fastlog.worker.mq.producer;
 
 import com.zmh.fastlog.model.event.ByteDisruptorEvent;
 import lombok.SneakyThrows;
-import org.apache.pulsar.client.api.MessageId;
 import org.apache.pulsar.client.api.Producer;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.impl.TypedMessageBuilderImpl;
 
 import java.nio.ByteBuffer;
-import java.util.concurrent.atomic.LongAdder;
+import java.util.concurrent.ScheduledFuture;
 
+import static com.zmh.fastlog.utils.ScheduleUtils.scheduleWithFixedDelay;
 import static com.zmh.fastlog.utils.Utils.*;
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
@@ -19,7 +19,6 @@ import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
 import static org.apache.pulsar.client.api.CompressionType.ZLIB;
 import static org.apache.pulsar.client.api.Schema.BYTES;
-import static org.apache.pulsar.shade.org.apache.commons.lang.StringUtils.isBlank;
 
 public class PulsarProducer implements MqProducer {
 
@@ -31,8 +30,10 @@ public class PulsarProducer implements MqProducer {
     private volatile PulsarClient client;
     private volatile Producer<byte[]> producer;
 
-    private long totalMissingCount = 0;
-    private final LongAdder pulsarMissingCount = new LongAdder();
+    private boolean isReady = false;
+
+    private int totalMissingCount = 0;
+    private int pulsarMissingCount = 0;
 
     public PulsarProducer(String url, String topic, int batchMessageSize) {
         if (isNotBlank(topic)) {
@@ -43,10 +44,20 @@ public class PulsarProducer implements MqProducer {
         this.batchMessageSize = batchMessageSize;
     }
 
+    private ScheduledFuture<?> connectFuture;
+
     @Override
-    public boolean connect() {
-        if (isBlank(url) || isBlank(topic)) {
-            return false;
+    public void connect() {
+        connectFuture = scheduleWithFixedDelay(this::doConnect, 0, 5, SECONDS);
+    }
+
+    private ScheduledFuture<?> heartbeatFuture;
+
+    private void doConnect() {
+        if (nonNull(client) && nonNull(producer)) {
+            connectFuture.cancel(true);
+
+            heartbeatFuture = scheduleWithFixedDelay(this::heartbeat, 0, 2, SECONDS);
         }
 
         try {
@@ -73,9 +84,7 @@ public class PulsarProducer implements MqProducer {
         }
         if (nonNull(client) && nonNull(producer)) {
             debugLog("pulsar connected![" + url + "][" + topic + "]");
-            return true;
         }
-        return false;
     }
 
     @Override
@@ -87,38 +96,39 @@ public class PulsarProducer implements MqProducer {
         pulsarMessage.getContent().limit(buffer.position());
 
         pulsarMessage.sendAsync()
-            .exceptionally(e -> {
-                debugLog("fastlog pulsar sendEvent fail, e:" + e.getMessage());
-                pulsarMissingCount.increment();
+            .exceptionally(t -> {
+                addMissingCount(t);
                 return null;
             })
             .thenRun(event::clear);
     }
 
-    @Override
-    public boolean hasMissedMsg() {
-        long sum = pulsarMissingCount.sumThenReset();
-        boolean result = sum > 0;
-        if (result) {
-            totalMissingCount += sum;
-            debugLog("pulsar mission count:" + sum + ", total:" + totalMissingCount);
+    private void addMissingCount(Throwable t) {
+        pulsarMissingCount++;
+        if (pulsarMissingCount == 10) { //todo zmh config 这里不确定会不会有并发问题
+            totalMissingCount += 10;
+            isReady = false;
+            debugLog("fastlog pulsar sendEvent fail, e:" + t.getMessage() + ",totalMissingCount:" + totalMissingCount);
         }
-        return result;
     }
 
     @Override
+    public boolean isReady() {
+        return isReady;
+    }
+
     @SneakyThrows
-    public boolean heartbeat() {
-        if (isNull(producer)) {
-            return false;
+    private void heartbeat() {
+        if (isReady) {
+            return;
         }
 
         try {
-            MessageId messageId = producer.send("heartbeat".getBytes());
-            return nonNull(messageId);
+            if (nonNull(producer.send("heartbeat".getBytes()))) {
+                this.isReady = true;
+            }
         } catch (Exception e) {
             debugLog("fastlog pulsar heartbeat fail, e:" + e.getMessage());
-            return false;
         }
 
     }
@@ -139,5 +149,8 @@ public class PulsarProducer implements MqProducer {
             safeClose(producer);
         }
         safeClose(client);
+        if (nonNull(heartbeatFuture)) {
+            heartbeatFuture.cancel(true);
+        }
     }
 }

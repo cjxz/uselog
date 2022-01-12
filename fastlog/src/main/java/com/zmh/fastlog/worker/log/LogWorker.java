@@ -1,35 +1,21 @@
 package com.zmh.fastlog.worker.log;
 
-import ch.qos.logback.classic.pattern.CallerDataConverter;
 import ch.qos.logback.classic.spi.ILoggingEvent;
-import ch.qos.logback.classic.spi.ThrowableProxyUtil;
 import com.lmax.disruptor.*;
 import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
 import com.zmh.fastlog.model.event.LogDisruptorEvent;
-import com.zmh.fastlog.utils.DateSequence;
-import com.zmh.fastlog.utils.JsonByteBuilder;
-import com.zmh.fastlog.utils.ThreadUtils;
-import com.zmh.fastlog.worker.Worker;
 import com.zmh.fastlog.model.message.AbstractMqMessage;
 import com.zmh.fastlog.model.message.LastConfirmedSeq;
+import com.zmh.fastlog.utils.ThreadUtils;
+import com.zmh.fastlog.worker.Worker;
 import lombok.Getter;
 import lombok.val;
-import org.apache.commons.lang3.time.FastDateFormat;
 
-import java.util.Map;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.atomic.LongAdder;
-
-import static com.zmh.fastlog.utils.ScheduleUtils.scheduleAtFixedRate;
 import static com.zmh.fastlog.utils.ThreadUtils.namedDaemonThreadFactory;
 import static com.zmh.fastlog.utils.Utils.debugLog;
 import static com.zmh.fastlog.utils.Utils.getNowTime;
-import static com.zmh.fastlog.worker.log.LogWorker.Consts.*;
-import static java.lang.System.currentTimeMillis;
 import static java.util.Objects.isNull;
-import static java.util.Objects.nonNull;
-import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.apache.commons.lang3.StringUtils.startsWithAny;
 
 /**
@@ -49,16 +35,14 @@ public class LogWorker implements Worker<Object>,
     private final int highWaterLevelMq;
     @Getter
     private final int highWaterLevelFile;
+
     // 日志缓冲区
     private final Disruptor<LogDisruptorEvent> queue;
     private final RingBuffer<LogDisruptorEvent> ringBuffer;
-    private volatile boolean isClosed = false;
 
     // 统计丢弃的日志数
-    private long totalMissingCount = 0;
-    private final LongAdder logMissingCount = new LongAdder();
-    private final LongAdder fileMissingCount = new LongAdder();
-    private final ScheduledFuture<?> missingSchedule = scheduleAtFixedRate(this::reportMissCount, 1, 5, SECONDS);
+    private final LogMissingCountAndPrint logMissingCount = new LogMissingCountAndPrint("log");
+    private final LogMissingCountAndPrint fileMissingCount = new LogMissingCountAndPrint("file");
 
     // 消息去向, 二选1
     // 初始时先通过file,file缓冲区为空的切到mq
@@ -66,11 +50,14 @@ public class LogWorker implements Worker<Object>,
     private boolean directWriteToMq = false;
     private final Worker<AbstractMqMessage> mqWorker;
     private final Worker<LogDisruptorEvent> fileWorker;
-    private final int maxMsgSize;
+
+    // 日志序列化类
+    private MessageConverter messageConverter;
+
+    private volatile boolean isClosed = false;
 
     public LogWorker(Worker<AbstractMqMessage> mqWorker, Worker<LogDisruptorEvent> fileWorker, int batchSize, int maxMsgSize) {
-        this.maxMsgSize = maxMsgSize;
-
+        this.messageConverter = new MessageConverter(maxMsgSize);
         this.mqWorker = mqWorker;
         this.fileWorker = fileWorker;
         // 缓冲区设置
@@ -107,7 +94,7 @@ public class LogWorker implements Worker<Object>,
                 return true;
             }
             if (!ringBuffer.tryPublishEvent((event, sequence) -> {
-                convertToByteMessage(msg, event.getByteBuilder());
+                messageConverter.convertToByteMessage(msg, event.getByteBuilder());
             })) {
                 logMissingCount.increment();
                 return false;
@@ -126,32 +113,10 @@ public class LogWorker implements Worker<Object>,
         return false;
     }
 
-    private boolean isExclude(ILoggingEvent message) {
-        if (isNull(message)) {
-            return true;
-        }
-        return startsWithAny(
-            message.getLoggerName(),
-            "ch.qos.logback",
-            "org.apache.pulsar",
-            "org.apache.kafka",
-            "org.rocksdb"
-        );
-    }
+    // 日志id, 发送成功一条加1, 用于识别每条日志，方便后续切换mq使用
+    private long lastMessageId = 0;
 
-    @Override
-    public void close() {
-        missingSchedule.cancel(true);
-        reportMissCount();
-        isClosed = true;
-        queue.shutdown();
-    }
-
-    // 日志id, 发送成功一条加1,
-    // 初始值 [ currentMillSeconds, 0 ]
-    //       [  41bit,    12bit       ]
-    private long lastMessageId = currentTimeMillis() << 12;
-
+    // ringbuffer的消费者逻辑，这里已经是单线程了，lastMessageId没有并发问题
     public void onEvent(LogDisruptorEvent event, long sequence, boolean endOfBatch) {
         long messageId = lastMessageId + 1;
         event.setId(messageId);
@@ -171,7 +136,7 @@ public class LogWorker implements Worker<Object>,
             // 写入失败, 切换到本地文件缓冲区
             if (!success && directWriteToMq) {
                 directWriteToMq = false;
-                debugLog("mq阻塞或者没准备好,切换到file cache," + getNowTime());
+                debugLog("mq阻塞,切换到file cache," + getNowTime());
             }
         }
 
@@ -197,58 +162,24 @@ public class LogWorker implements Worker<Object>,
         event.clear();
     }
 
-    private final static DateSequence dataSeq = new DateSequence();
-    private final FastDateFormat dateFormat = FastDateFormat.getInstance("yyyy-MM-dd HH:mm:ss.SSS");
-
-    void convertToByteMessage(ILoggingEvent log, JsonByteBuilder jsonByteBuilder) {
-        jsonByteBuilder.clear()
-            .beginObject()
-            .key(DATA_SEQ).value(dataSeq.next())
-            .key(DATA_MESSAGE).value(log.getFormattedMessage(), maxMsgSize)
-            .key(DATA_LOGGER).value(log.getLoggerName())
-            .key(DATA_THREAD).value(log.getThreadName())
-            .key(DATA_LEVEL).value(log.getLevel().levelStr);
-
-        long timeStamp = log.getTimeStamp();
-        jsonByteBuilder
-            .key(DATA_TIME_MILLSECOND).value(timeStamp)
-            .key(DATA_TIMESTAMP).value(dateFormat.format(timeStamp));
-
-        if (nonNull(log.getMarker())) {
-            jsonByteBuilder
-                .key(DATA_MARKER)
-                .value(log.getMarker().toString());
+    private boolean isExclude(ILoggingEvent message) {
+        if (isNull(message)) {
+            return true;
         }
-        if (log.hasCallerData()) {
-            jsonByteBuilder
-                .key(DATA_CALLER)
-                .value(new CallerDataConverter().convert(log));
-        }
-        if (nonNull(log.getThrowableProxy())) {
-            jsonByteBuilder
-                .key(DATA_THROWABLE)
-                .value(ThrowableProxyUtil.asString(log.getThrowableProxy()));
-        }
-        Map<String, String> mdc = log.getMDCPropertyMap();
-        if (mdc.size() > 0) {
-            mdc.forEach((k, v) -> jsonByteBuilder.key(k).value(v));
-        }
-
-        jsonByteBuilder.endObject();
+        return startsWithAny(
+            message.getLoggerName(),
+            "ch.qos.logback",
+            "org.apache.pulsar",
+            "org.apache.kafka"
+        );
     }
 
-    private void reportMissCount() {
-        long sum1 = logMissingCount.sumThenReset();
-        if (sum1 > 0) {
-            totalMissingCount += sum1;
-            debugLog("log mission count:" + sum1 + ", total:" + totalMissingCount);
-        }
-
-        long sum2 = fileMissingCount.sumThenReset();
-        if (sum2 > 0) {
-            totalMissingCount += sum2;
-            debugLog("file mission count:" + sum2 + ", total:" + totalMissingCount);
-        }
+    @Override
+    public void close() {
+        logMissingCount.close();
+        fileMissingCount.close();
+        isClosed = true;
+        queue.shutdown();
     }
 
     private Sequence sequenceCallback;
@@ -265,6 +196,11 @@ public class LogWorker implements Worker<Object>,
         nextNotifySeq = 0;
     }
 
+    /**
+     * 每发送成功128条日志，则标记ringbuffer该128条日志已消费完成，可以供后续写入，
+     * 原因是ringbuffer是批量消费的，每次等批量执行完成之后，再批量标记消费完成，
+     * 这样可以防止当ringbuffer一次性消费过多的日志时，可以提前标记消费完成，防止占用太多内存无法供后续写入
+     */
     private void notifySeq(long currentSeq) {
         long nextNotifySeq = this.nextNotifySeq;
         if (0 == nextNotifySeq) {
@@ -275,19 +211,5 @@ public class LogWorker implements Worker<Object>,
             sequenceCallback.set(currentSeq);
             this.nextNotifySeq = currentSeq + 128;
         }
-    }
-
-    @SuppressWarnings("unused")
-    static class Consts {
-        static final String DATA_MESSAGE = "message";
-        static final String DATA_LOGGER = "logger";
-        static final String DATA_THREAD = "thread";
-        static final String DATA_LEVEL = "level";
-        static final String DATA_MARKER = "marker"; //todo
-        static final String DATA_CALLER = "caller"; //todo
-        static final String DATA_SEQ = "seq";
-        static final String DATA_THROWABLE = "throwable";
-        static final String DATA_TIME_MILLSECOND = "ts";
-        static final String DATA_TIMESTAMP = "@timestamp";
     }
 }

@@ -8,7 +8,6 @@ public class KafkaProducerTest {
     public void testHeartbeat() {
         try (KafkaProducer producer = new KafkaProducer("10.106.112.57:9092", "log4", 12)) {
             producer.connect();
-            System.out.println(producer.heartbeat());
         }
     }
 }

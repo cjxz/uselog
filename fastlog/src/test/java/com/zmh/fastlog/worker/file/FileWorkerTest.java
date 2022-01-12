@@ -9,6 +9,7 @@ import lombok.SneakyThrows;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.commons.lang3.time.StopWatch;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import java.io.File;
@@ -23,10 +24,10 @@ import static org.junit.Assert.*;
 
 public class FileWorkerTest {
 
-    //@Ignore
+    @Ignore
     @Test
     public void test() {
-        try (FIFOQueue fifo = new FIFOQueue(64 * 1024 * 1024, "logs/cache")) {
+        try (FIFOQueue fifo = new FIFOQueue(64 * 1024 * 1024, 100, "logs/cache")) {
             StopWatch watch = new StopWatch();
             DateSequence seq = new DateSequence();
 
@@ -84,7 +85,7 @@ public class FileWorkerTest {
 
     @Test
     public void testFIFOFileQueuePutAndGet() {
-        try (FIFOQueue fifoFile = new FIFOQueue(1024, "logs/cache")) {
+        try (FIFOQueue fifoFile = new FIFOQueue(1024, 100,"logs/cache")) {
             DateSequence seq = new DateSequence();
 
             for (int i = 0; i < 7; i++) {
@@ -98,7 +99,7 @@ public class FileWorkerTest {
 
     @Test
     public void testFIFOFileQueuePutAndGetNum() {
-        try (FIFOQueue fifoFile = new FIFOQueue(32 * 1024 * 1024, "logs/cache")) {
+        try (FIFOQueue fifoFile = new FIFOQueue(32 * 1024 * 1024, 100,"logs/cache")) {
             DateSequence seq = new DateSequence();
 
             String text = "中文English123中文English123中文English123中文English123中文English123中文English123中文English123中文English123中文English123中文English123中文English123中文English123";
@@ -109,7 +110,10 @@ public class FileWorkerTest {
             for (int i = 0; i < 100; i++) {
                 for (int j = 0; j < 1_0000; j++) {
                     ByteEvent byteEvent = new ByteEvent();
-                    byteEvent.setBuffer(ByteBuffer.wrap(bytes));
+
+                    ByteBuffer buffer = ByteBuffer.allocate(bytes.length);
+                    buffer.put(bytes);
+                    byteEvent.setBuffer(buffer);
                     byteEvent.setId(seq.next());
                     fifoFile.put(byteEvent);
                 }
@@ -169,7 +173,7 @@ public class FileWorkerTest {
         }
 
         assertFalse(queue.isEmpty());
-        assertEquals(5 * (128 + 4 + 8), queue.getBytes().writerIndex());
+        assertEquals(5 * (100 + 4 + 8), queue.getBytes().writerIndex());
 
         for (int i = 0; i < 5; i++) {
             FileMqMessage message = queue.get();
@@ -181,7 +185,7 @@ public class FileWorkerTest {
 
     @Test
     public void testBytesCacheQueueFull() {
-        BytesCacheQueue queue = new BytesCacheQueue(1024);
+        BytesCacheQueue queue = new BytesCacheQueue(800);
 
         DateSequence seq = new DateSequence();
 
@@ -213,8 +217,8 @@ public class FileWorkerTest {
 
     @Test
     public void testBytesCacheQueueCopyTo() {
-        BytesCacheQueue tail = new BytesCacheQueue(1024);
-        BytesCacheQueue head = new BytesCacheQueue(1024);
+        BytesCacheQueue tail = new BytesCacheQueue(800);
+        BytesCacheQueue head = new BytesCacheQueue(800);
         DateSequence seq = new DateSequence();
 
 
@@ -241,7 +245,10 @@ public class FileWorkerTest {
         Arrays.fill(array, b);
 
         ByteEvent byteEvent = new ByteEvent();
-        byteEvent.setBuffer(ByteBuffer.wrap(array));
+
+        ByteBuffer buffer = ByteBuffer.allocate(128);
+        buffer.put(array, 0, 100);
+        byteEvent.setBuffer(buffer);
         byteEvent.setId(id);
         return queue.put(byteEvent);
     }
@@ -251,7 +258,10 @@ public class FileWorkerTest {
         Arrays.fill(array, b);
 
         ByteEvent byteEvent = new ByteEvent();
-        byteEvent.setBuffer(ByteBuffer.wrap(array));
+
+        ByteBuffer buffer = ByteBuffer.allocate(128);
+        buffer.put(array, 0, 100);
+        byteEvent.setBuffer(buffer);
         byteEvent.setId(id);
         file.put(byteEvent);
     }

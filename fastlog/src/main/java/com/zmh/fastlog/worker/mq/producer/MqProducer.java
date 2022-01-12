@@ -4,13 +4,11 @@ import com.zmh.fastlog.model.event.ByteDisruptorEvent;
 
 public interface MqProducer extends AutoCloseable {
 
-    boolean connect();
+    void connect();
 
     void sendEvent(ByteDisruptorEvent event);
 
-    boolean hasMissedMsg();
-
-    boolean heartbeat();
+    boolean isReady();
 
     void flush();
 }

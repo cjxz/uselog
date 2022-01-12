@@ -34,14 +34,26 @@ import static java.util.stream.Collectors.toCollection;
 
 public class FIFOQueue implements AutoCloseable {
 
+    /**
+     * 队列尾巴 是 写缓冲区
+     * 使用双内存队列的原因是，当其中一个队列满的时候需要flush到磁盘，这段时间比较长，如果后续日志发送又快的话，会造成日志丢失
+     * 所以将flush的操作异步，异步期间使用另外一个内存队列存放日志数据
+     */
     private final TwoBytesCacheQueue tail;
 
     private final LogFiles logFiles;
 
+    /**
+     * 队列头 是 读缓冲区
+     * 队列头的数据来源有两种场景：
+     * 1、如果日志还没有多到需要放入磁盘的话，会将写缓冲区的日志数据直接复制队列头，这样写缓冲区可以继续写，读缓冲区可以从内存中读取，
+     *    注意：这里的写缓冲区的数据不一定是满的，因为当日志的写入和读取速度相当的时候，日志可以直接从写缓冲区中获取，而不一定是非得从读缓冲区中获取
+     * 2、如果日志多到已经写入磁盘，那最早的日志数据一定在磁盘文件，此时需要从磁盘中读取文件写入该读缓冲区，供后续读取日志使用
+     */
     private final BytesCacheQueue head;
 
     @SneakyThrows
-    FIFOQueue(int cacheSize, String folder) {
+    FIFOQueue(int cacheSize, int maxFileCount, String folder) {
         Path path = Paths.get(folder);
 
         if (!Files.exists(path)) {
@@ -51,7 +63,7 @@ public class FIFOQueue implements AutoCloseable {
         logFiles = LogFiles.builder()
             .queueName("queue")
             .folder(path)
-            .maxFileCount(cacheSize)
+            .maxFileCount(maxFileCount)
             .build();
 
         tail = new TwoBytesCacheQueue(cacheSize);
@@ -68,36 +80,33 @@ public class FIFOQueue implements AutoCloseable {
             tail.reset();
         } else {
             flush();
-            tail.switchHead();
         }
 
         tail.put(byteBuffer);
     }
 
-    private AbstractMqMessage message;
+    private AbstractMqMessage currentMessage;
 
     public AbstractMqMessage get() {
-        if (nonNull(message)) {
-            return message;
+        if (isNull(currentMessage)) {
+            next();
         }
+        return currentMessage;
+    }
 
-        message = head.get();
-        if (nonNull(message)) {
-            return message;
+    public void next() {
+        currentMessage = head.get();
+        if (nonNull(currentMessage)) {
+            return;
         }
 
         if (fileSize() > 0) {
             logFiles.pollTo(head.getBytes());
-            message = head.get();
-            return message;
+            currentMessage = head.get();
+            return;
         }
 
-        message = tail.get();
-        return message;
-    }
-
-    public void next() {
-        message = null;
+        currentMessage = tail.get();
     }
 
     // for test
@@ -109,7 +118,10 @@ public class FIFOQueue implements AutoCloseable {
         if (tail.isEmpty()) {
             return;
         }
-        logFiles.write(tail.getUsed());
+
+        tail.waitFutureDone();
+        Future<?> future = logFiles.write(tail.getBytes());
+        tail.flush(future);
     }
 
     @Override
@@ -121,49 +133,85 @@ public class FIFOQueue implements AutoCloseable {
 }
 
 class TwoBytesCacheQueue {
-    @Getter
-    private BytesCacheQueue used;
-    private BytesCacheQueue other;
+
+    private BytesCacheQueueFlush used;
+    private BytesCacheQueueFlush other;
 
     public TwoBytesCacheQueue(int size) {
-        used = new BytesCacheQueue(size);
-        other = new BytesCacheQueue(size);
+        used = new BytesCacheQueueFlush(size);
+        other = new BytesCacheQueueFlush(size);
     }
 
-    public void switchHead() {
-        other.checkPut();
-        other.reset();
-        BytesCacheQueue temp = used;
+    public void flush(Future<?> future) {
+        this.used.flush(future);
+        switchQueue();
+    }
+
+    public void waitFutureDone() {
+        this.other.waitFutureDone();
+    }
+
+    private void switchQueue() {
+        other.getQueue().reset();
+        BytesCacheQueueFlush temp = used;
         used = other;
         other = temp;
     }
 
     public boolean put(ByteEvent event) {
-        return used.put(event);
+        return this.used.getQueue().put(event);
     }
 
     public FileMqMessage get() {
-        return used.get();
+        return this.used.getQueue().get();
     }
 
     public void reset() {
-        this.used.reset();
+        this.used.getQueue().reset();
     }
 
     public boolean isEmpty() {
-        return this.used.isEmpty();
+        return this.used.getQueue().isEmpty();
     }
 
     public void copyTo(BytesCacheQueue queue) {
-        this.used.copyTo(queue);
+        this.used.getQueue().copyTo(queue);
+    }
+
+    public Bytes getBytes() {
+        return this.used.getQueue().getBytes();
+    }
+}
+
+class BytesCacheQueueFlush {
+    @Getter
+    private final BytesCacheQueue queue;
+    private Future<?> future;
+
+    public BytesCacheQueueFlush(int size) {
+        this.queue = new BytesCacheQueue(size);
+    }
+
+    public void flush(Future<?> future) {
+        this.future = future;
+    }
+
+    @SneakyThrows
+    public void waitFutureDone() {
+        if (isNull(future) || future.isDone()) {
+            return;
+        }
+        StopWatch stopWatch = new StopWatch();
+        stopWatch.start();
+        future.get();
+        stopWatch.stop();
+        debugLog("wait future:" + stopWatch.formatTime());
     }
 }
 
 class BytesCacheQueue {
     @Getter
     private final Bytes bytes;
-
-    private Future<?> future;
 
     public BytesCacheQueue(int size) {
         this.bytes = Bytes.allocate(size);
@@ -173,15 +221,13 @@ class BytesCacheQueue {
         ByteBuffer bb = event.getBuffer();
         val writerIndex = this.bytes.writerIndex();
 
-        if (writerIndex + Long.BYTES + Integer.BYTES + bb.limit() > bytes.capacity()) {
+        if (writerIndex + Long.BYTES + Integer.BYTES + bb.position() > bytes.capacity()) {
             return false;
         }
 
-        this.bytes.write4B(0); // write fake length
+        this.bytes.write4B(bb.position()); //日志的长度 单位：字节
         this.bytes.write8B(event.getId());
-        this.bytes.writeNB(bb.array());
-
-        this.bytes.set4B(writerIndex, this.bytes.writerIndex() - writerIndex - Integer.BYTES - Long.BYTES); // write real length
+        this.bytes.writeNB(bb.array(), 0 ,bb.position());
         return true;
     }
 
@@ -202,26 +248,10 @@ class BytesCacheQueue {
 
             return new FileMqMessage(id, readBuffer, readCount);
         } else {
-            debugLog("fast log BytesCacheQueue readCount error " + readCount);
+            debugLog("fastlog BytesCacheQueue readCount error " + readCount);
             this.bytes.reset();
             return null;
         }
-    }
-
-    public void asyncToDisk(Future<?> future) {
-        this.future = future;
-    }
-
-    @SneakyThrows
-    public void checkPut() {
-        if (isNull(future) || future.isDone()) {
-            return;
-        }
-        StopWatch stopWatch = new StopWatch();
-        stopWatch.start();
-        future.get();
-        stopWatch.stop();
-        System.out.println("wait future:" + stopWatch.formatTime());
     }
 
     public void reset() {
@@ -263,41 +293,25 @@ class LogFiles implements AutoCloseable {
     }
 
     @SneakyThrows
-    public void write(@NonNull BytesCacheQueue bytesCacheQueue) {
-        Bytes bytes = bytesCacheQueue.getBytes();
-
-        Future<?> future = singleThreadExecutor.submit(() -> {
+    public Future<?> write(@NonNull Bytes bytes) {
+         return singleThreadExecutor.submit(() -> {
             StopWatch stopWatch = new StopWatch();
             stopWatch.reset();
             stopWatch.start();
             val file = files.createNextFile();
             WriteBytesUtils.write(file, bytes);
             stopWatch.stop();
-            System.out.println("wait file：" + stopWatch.formatTime());
+            debugLog("wait file：" + stopWatch.formatTime());
 
-            if (isLimitExceeded()) {
+            if (getFileSize() > maxCount) {
                 Path poll = files.poll();
                 files.remove(poll);
-                System.out.println("remove file：" + poll.getFileName());
+                debugLog("remove file：" + poll.getFileName());
             }
         });
-        bytesCacheQueue.asyncToDisk(future);
     }
 
     public void pollTo(@NonNull Bytes buffer) {
-        readTo(buffer);
-    }
-
-    public int getFileSize() {
-        return files.getFilesFromQueue().size();
-    }
-
-    private boolean isLimitExceeded() {
-        return getFileSize() > maxCount;
-    }
-
-    @SuppressWarnings("PMD.AvoidInstantiatingObjectsInLoops")
-    private void readTo(Bytes buffer) {
         do {
             val file = files.peek();
             try {
@@ -310,7 +324,8 @@ class LogFiles implements AutoCloseable {
                 if (length > 0) {
                     files.remove(file);
                 } else {
-                    System.out.println("read empty file");
+                    // 异步flush到磁盘时，已经将file对应的path放入files中，但是该file还未写入磁盘成功，此时会读取失败，属于正常现场，需要下次再来读取
+                    debugLog("read empty file");
                 }
                 return;
             } catch (Exception ex) {
@@ -320,9 +335,14 @@ class LogFiles implements AutoCloseable {
         } while (true);
     }
 
+    public int getFileSize() {
+        return files.getFilesFromQueue().size();
+    }
+
     @Override
     public void close() {
         files.close();
+        singleThreadExecutor.shutdown();
     }
 
 }

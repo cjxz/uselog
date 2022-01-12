@@ -8,7 +8,6 @@ public class PulsarProducerTest {
     public void testHeartbeat() {
         try (PulsarProducer producer = new PulsarProducer("pulsar://localhost:6650", "persistent://log/test/test-topic", 12)) {
             producer.connect();
-            System.out.println(producer.heartbeat());
         }
     }
 }

@@ -26,8 +26,8 @@ public class FileWorker implements Worker<LogDisruptorEvent>, EventHandler<ByteD
 
     private volatile boolean isClose;
 
-    public FileWorker(Worker<AbstractMqMessage> mqWorker, int cacheSize, String folder) {
-        fifo = new FIFOQueue(cacheSize, folder);
+    public FileWorker(Worker<AbstractMqMessage> mqWorker, int cacheSize, int maxFileCount, String folder) {
+        fifo = new FIFOQueue(cacheSize, maxFileCount, folder);
 
         this.mqWorker = mqWorker;
         queue = new Disruptor<>(
