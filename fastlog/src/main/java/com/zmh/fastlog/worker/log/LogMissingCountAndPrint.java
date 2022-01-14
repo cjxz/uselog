@@ -32,6 +32,11 @@ public class LogMissingCountAndPrint implements Closeable {
         }
     }
 
+    public long getTotalMissingCount() {
+        reportMissCount();
+        return totalMissingCount;
+    }
+
     @Override
     public void close() {
         sneakyInvoke(() -> missingSchedule.cancel(true));

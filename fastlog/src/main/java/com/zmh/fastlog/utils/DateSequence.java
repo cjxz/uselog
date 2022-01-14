@@ -2,18 +2,18 @@ package com.zmh.fastlog.utils;
 
 import java.util.concurrent.atomic.AtomicLong;
 
-import static java.lang.System.currentTimeMillis;
+import static com.zmh.fastlog.utils.ImpureUtils.currentTimeMillis;
 
 public class DateSequence {
 
-    private final static long MILL_SECOND_OFFSET = 1546300800000L;
+    private final static long MILL_SECOND_OFFSET = 1640966400000L; // 2022-01-01 00:00:00
     /**
      * 最后一个生成的序列编号
      *
      * 0,    millSec,    bizId,      seq
      * 1bit, 41bit,      10bit,      12bit
      * 0,    [0, now()], [0, 1024],  [0, 4095]
-     * 41位的时间序列，精确到毫秒，从2019-01-01起,可以用至2089-01-01年
+     * 41位的时间序列，精确到毫秒，大概可以用69年8个月，从2022年01月，大约可以用至2091年09月
      * 10位的机器标识，最多支持部署1024个节点
      * 12位的序列号，支持每个节点每毫秒产生4096个ID序号，最高位是符号位始终为0。
      */
@@ -82,16 +82,12 @@ public class DateSequence {
                 newSeq = batchSize;
             } else if (prevMill == newMill) {
                 newSeq = prevSeq + batchSize;
-                if (newSeq == 4096) {
-                    newMill = newMill + 1;
-                    continue;
-                }
             } else { // prevMill > newMill
                 newMill = prevMill;
                 newSeq = prevSeq + batchSize;
             }
 
-            // overflow
+            // seq算出来大于等于4096的话，会求整加到毫秒里
             long mill = newMill + (newSeq >>> 12);
             long curt = (mill << 22) | bizId | (newSeq & 0x0FFF);
             if (last.compareAndSet(prev, curt)) {

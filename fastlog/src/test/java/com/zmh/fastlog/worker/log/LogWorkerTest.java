@@ -5,6 +5,7 @@ import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.classic.spi.LoggingEvent;
+import com.google.common.util.concurrent.RateLimiter;
 import com.zmh.fastlog.model.event.LogDisruptorEvent;
 import com.zmh.fastlog.worker.Worker;
 import com.zmh.fastlog.model.message.AbstractMqMessage;
@@ -16,7 +17,7 @@ import java.util.Objects;
 
 import static com.zmh.fastlog.utils.ThreadUtils.sleep;
 import static org.apache.pulsar.shade.org.apache.commons.lang3.reflect.FieldUtils.writeField;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -107,26 +108,28 @@ public class LogWorkerTest {
         }
     }
 
-    @SuppressWarnings("unchecked")
+    @SuppressWarnings({"unchecked", "UnstableApiUsage"})
     @Test
     @SneakyThrows
     public void missingCountTest() {
-        Worker<AbstractMqMessage> mqWorker = mock(Worker.class);
-        when(mqWorker.sendMessage(any())).thenReturn(false);
+        RateLimiter limiter = RateLimiter.create(5000);
+
         Worker<LogDisruptorEvent> fileWorker = mock(Worker.class);
         when(fileWorker.sendMessage(any())).thenReturn(false);
 
-        try (LogWorker logWorker = new LogWorker(mqWorker, fileWorker, 1024, 1024)) {
-            writeField(logWorker, "directWriteToMq", true, true);
-
+        try (LogWorker logWorker = new LogWorker(mock(Worker.class), fileWorker, 128, 1024)) {
             for (int i = 0; i < logWorker.getHighWaterLevelFile(); i++) {
+                limiter.acquire();
                 boolean success = logWorker.sendMessage(getLoggingEvent());
                 assertTrue(success);
             }
 
+            assertEquals(0, logWorker.logMissingCount.getTotalMissingCount());
+
             // 达到警戒水位，继续等待
             sleep(500);
 
+            assertEquals(logWorker.getHighWaterLevelFile() - logWorker.getHighWaterLevelMq(), logWorker.fileMissingCount.getTotalMissingCount());
         }
     }
 

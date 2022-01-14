@@ -41,8 +41,8 @@ public class LogWorker implements Worker<Object>,
     private final RingBuffer<LogDisruptorEvent> ringBuffer;
 
     // 统计丢弃的日志数
-    private final LogMissingCountAndPrint logMissingCount = new LogMissingCountAndPrint("log");
-    private final LogMissingCountAndPrint fileMissingCount = new LogMissingCountAndPrint("file");
+    final LogMissingCountAndPrint logMissingCount = new LogMissingCountAndPrint("log");
+    final LogMissingCountAndPrint fileMissingCount = new LogMissingCountAndPrint("file");
 
     // 消息去向, 二选1
     // 初始时先通过file,file缓冲区为空的切到mq
