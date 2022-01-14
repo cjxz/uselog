@@ -8,10 +8,9 @@ import com.zmh.fastlog.model.message.AbstractMqMessage;
 import com.zmh.fastlog.model.message.LastConfirmedSeq;
 import com.zmh.fastlog.utils.ThreadUtils;
 import com.zmh.fastlog.worker.Worker;
+import com.zmh.fastlog.worker.log.LogMissingCountAndPrint;
 import com.zmh.fastlog.worker.mq.producer.MqProducer;
 import lombok.SneakyThrows;
-
-import java.nio.ByteBuffer;
 
 import static com.zmh.fastlog.utils.ThreadUtils.namedDaemonThreadFactory;
 import static com.zmh.fastlog.utils.Utils.debugLog;
@@ -70,22 +69,23 @@ public class MqWorker implements Worker<AbstractMqMessage>,
     // 上次mq成功发送出去的messageId
     private long lastMessageId;
 
+    private LogMissingCountAndPrint logMissingCount = new LogMissingCountAndPrint("mq");
+
     @Override
     public void onEvent(ByteDisruptorEvent event, long sequence, boolean endOfBatch) {
         // 消费的时候，有可能mqProducer还没准备好，此时需要尽可能的等待mqProducer准备好为止
         while (!mqProducer.isReady()) {
-            ThreadUtils.sleep(100); // todo zmh ??
+            ThreadUtils.sleep(100);
         }
 
         long processMessageId = event.getByteEvent().getId();
-
         if (processMessageId == 0L) {
-            ByteBuffer buffer = event.getByteEvent().getBuffer();
-            System.out.println("lastMessageId " + processMessageId + " position " + buffer.position() + " limit" + buffer.limit() + " size" + buffer.capacity());
+            logMissingCount.increment();
         }
+
         mqProducer.sendEvent(event);
 
-        if (++batchIndex >= batchSize || endOfBatch) { //todo zmh
+        if (++batchIndex >= batchSize || endOfBatch) {
             mqProducer.flush();
             sequenceCallback.set(sequence);
             batchIndex = 0;

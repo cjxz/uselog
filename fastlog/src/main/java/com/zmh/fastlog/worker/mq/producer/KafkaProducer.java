@@ -75,10 +75,10 @@ public class KafkaProducer implements MqProducer {
         producer.send(record, (metadata, e) -> {
             if (nonNull(e)) {
                 addMissingCount(e);
-            } else {
-                event.clear();
             }
         });
+
+        event.clear();
     }
 
     private void addMissingCount(Exception e) {
@@ -114,6 +114,7 @@ public class KafkaProducer implements MqProducer {
 
     @Override
     public void flush() {
+        //producer.flush();
     }
 
     @Override

@@ -24,7 +24,6 @@ public class JsonByteBuilder {
         escapeTab[92] = 2; // \ 反斜杠 092
     }
 
-
     private byte[] bufferArray;
     private int pos;
 
@@ -128,6 +127,10 @@ public class JsonByteBuilder {
 
     public byte[] array() {
         return bufferArray;
+    }
+
+    public void array(byte[] bufferArray) {
+        this.bufferArray = bufferArray;
     }
 
     public JsonByteBuilder clear() {

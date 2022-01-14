@@ -16,7 +16,7 @@ public class FastLogConfig {
      */
     private boolean enable;
     /**
-     * 一批处理多少条日志
+     * mq一批发送多少条日志
      * 默认：128
      */
     private int batchMessageSize;

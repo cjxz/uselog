@@ -1,9 +1,6 @@
 package com.zmh.fastlog.worker.file;
 
-import com.lmax.disruptor.EventHandler;
-import com.lmax.disruptor.LiteTimeoutBlockingWaitStrategy;
-import com.lmax.disruptor.RingBuffer;
-import com.lmax.disruptor.TimeoutHandler;
+import com.lmax.disruptor.*;
 import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
 import com.zmh.fastlog.model.event.ByteDisruptorEvent;
@@ -15,7 +12,7 @@ import static com.zmh.fastlog.utils.ThreadUtils.namedDaemonThreadFactory;
 import static java.util.Objects.nonNull;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
-public class FileWorker implements Worker<LogDisruptorEvent>, EventHandler<ByteDisruptorEvent>, TimeoutHandler {
+public class FileWorker implements Worker<LogDisruptorEvent>, SequenceReportingEventHandler<ByteDisruptorEvent>, TimeoutHandler {
 
     private final Worker<AbstractMqMessage> mqWorker;
     private final Disruptor<ByteDisruptorEvent> queue;
@@ -52,6 +49,8 @@ public class FileWorker implements Worker<LogDisruptorEvent>, EventHandler<ByteD
         fifo.put(event.getByteEvent());
         event.clear();
 
+        sequenceCallback.set(sequence);
+
         if (endOfBatch) {
             onTimeout(sequence);
         }
@@ -75,6 +74,12 @@ public class FileWorker implements Worker<LogDisruptorEvent>, EventHandler<ByteD
         fifo.close();
     }
 
+    private Sequence sequenceCallback;
+
+    @Override
+    public void setSequenceCallback(Sequence sequenceCallback) {
+        this.sequenceCallback = sequenceCallback;
+    }
 }
 
 

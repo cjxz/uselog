@@ -23,6 +23,7 @@ public class FileMqMessage extends AbstractMqMessage {
 
     public void apply(ByteEvent event) {
         event.clear();
+
         if (isNull(data) || 0 == dataLength) {
             return;
         }

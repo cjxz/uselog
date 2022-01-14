@@ -219,15 +219,14 @@ class BytesCacheQueue {
 
     public boolean put(ByteEvent event) {
         ByteBuffer bb = event.getBuffer();
-        val writerIndex = this.bytes.writerIndex();
 
-        if (writerIndex + Long.BYTES + Integer.BYTES + bb.position() > bytes.capacity()) {
+        if (this.bytes.writerIndex() + Long.BYTES + Integer.BYTES + bb.limit() > bytes.capacity()) {
             return false;
         }
 
-        this.bytes.write4B(bb.position()); //日志的长度 单位：字节
+        this.bytes.write4B(bb.limit()); //日志的长度 单位：字节
         this.bytes.write8B(event.getId());
-        this.bytes.writeNB(bb.array(), 0 ,bb.position());
+        this.bytes.writeNB(bb.array(), 0 ,bb.limit());
         return true;
     }
 

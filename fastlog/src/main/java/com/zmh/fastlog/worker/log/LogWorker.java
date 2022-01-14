@@ -158,8 +158,9 @@ public class LogWorker implements Worker<Object>,
             fileMissingCount.increment();
         }
 
-        notifySeq(sequence);
+        // clear必须在notify之前，否则notify之后，新的数据可能立马放入event中，后执行clear可能会把新的数据给clear掉
         event.clear();
+        notifySeq(sequence);
     }
 
     private boolean isExclude(ILoggingEvent message) {

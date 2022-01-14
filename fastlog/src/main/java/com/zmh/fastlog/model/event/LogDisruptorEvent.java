@@ -9,7 +9,8 @@ import lombok.ToString;
 import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 
-import static com.zmh.fastlog.utils.Utils.marginToBuffer;
+import static com.zmh.fastlog.utils.Utils.debugLog;
+import static java.util.Objects.nonNull;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
@@ -41,22 +42,27 @@ public class LogDisruptorEvent extends AbstractMqMessage {
         return byteBuilder;
     }
 
+    /**
+     * event 中的 buffer 中的byte[] 跟 byteBuilder 中的byte[] 互换引用
+     */
     @Override
     public void apply(ByteEvent event) {
         event.clear();
 
-        ByteBuffer buff = event.getBuffer();
-        if (buff == null || buff.capacity() < byteBuilder.pos()) {
-            int len = marginToBuffer(byteBuilder.pos());
-            buff = ByteBuffer.wrap(new byte[len]);
+        if (byteBuilder.pos() <= 0) {
+            debugLog("LogDisruptorEvent apply error pos" + byteBuilder.pos());
         }
-        buff.put(byteBuilder.array(), 0, byteBuilder.pos());
 
-        long id = this.getId();
-        event.setId(id);
-        if (id == 0L) {
-            System.out.println("log set id " + id);
+        byte[] temp = byteBuilder.array();
+        ByteBuffer buff = event.getBuffer();
+        if (nonNull(buff)) {
+            byteBuilder.array(buff.array());
+        } else {
+            byteBuilder.array(new byte[INIT_SIZE]);
         }
+        buff = ByteBuffer.wrap(temp, 0, byteBuilder.pos());
+
+        event.setId(this.getId());
         event.setBuffer(buff);
     }
 }

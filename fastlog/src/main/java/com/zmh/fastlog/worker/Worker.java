@@ -1,15 +1,13 @@
 package com.zmh.fastlog.worker;
 
-import java.io.Closeable;
-
 /**
  * @author zmh
  *
  * 消息发送接口, 无阻塞
  */
-public interface Worker<T> extends Closeable {
+public interface Worker<MESSAGE> extends AutoCloseable {
 
-    boolean sendMessage(T message);
+    boolean sendMessage(MESSAGE message);
 
     void close();
 }
