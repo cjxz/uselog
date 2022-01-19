@@ -10,7 +10,7 @@ public class JsonByteBuilderTest { //todo zmh 加一个ensure的单元测试
     @Test
     @SneakyThrows
     public void test() {
-        JsonByteBuilder json = JsonByteBuilder.create(1024)
+        JsonByteBuilder json = JsonByteBuilder.create()
             .beginObject()
             .key("hi\"wo").value(1234567890)
             .key("key2").value("value\2")
@@ -23,7 +23,7 @@ public class JsonByteBuilderTest { //todo zmh 加一个ensure的单元测试
 
     @Test
     public void testNullObject() {
-        JsonByteBuilder builder = JsonByteBuilder.create(1024)
+        JsonByteBuilder builder = JsonByteBuilder.create()
             .beginObject()
             .key("hi").value(null)
             .endObject();
@@ -48,7 +48,7 @@ public class JsonByteBuilderTest { //todo zmh 加一个ensure的单元测试
 
     @Test
     public void testCJK() {
-        String json = JsonByteBuilder.create(1024)
+        String json = JsonByteBuilder.create()
             .beginObject()
             .key("the中文key").value("enn.中文..value")
             .endObject()
@@ -58,7 +58,7 @@ public class JsonByteBuilderTest { //todo zmh 加一个ensure的单元测试
 
     @Test
     public void testCut() {
-        String json = JsonByteBuilder.create(1024)
+        String json = JsonByteBuilder.create()
             .beginObject()
             .key("key").value("valuevalue中文", 11)
             .endObject()

@@ -1,7 +1,7 @@
 package com.zmh.fastlog.worker.mq.producer;
 
-import com.zmh.fastlog.model.event.ByteDisruptorEvent;
-import com.zmh.fastlog.model.event.ByteEvent;
+import com.zmh.fastlog.model.event.ByteDataSoftRef;
+import com.zmh.fastlog.model.message.ByteData;
 import lombok.SneakyThrows;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.clients.producer.RecordMetadata;
@@ -68,9 +68,12 @@ public class KafkaProducer implements MqProducer {
     }
 
     @Override
-    public void sendEvent(ByteDisruptorEvent event) {
-        ByteEvent byteEvent = event.getByteEvent();
-        ProducerRecord<String, ByteBuffer> record = new ProducerRecord<>(topic, byteEvent.getBuffer());
+    public void sendEvent(ByteDataSoftRef event) {
+        ByteData byteData = event.getByteData();
+
+        ByteBuffer buffer = ByteBuffer.wrap(byteData.getData());
+        buffer.limit(byteData.getDataLength());
+        ProducerRecord<String, ByteBuffer> record = new ProducerRecord<>(topic, buffer);
 
         producer.send(record, (metadata, e) -> {
             if (nonNull(e)) {

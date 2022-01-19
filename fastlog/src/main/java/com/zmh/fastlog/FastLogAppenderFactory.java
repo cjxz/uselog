@@ -1,8 +1,7 @@
 package com.zmh.fastlog;
 
 import com.zmh.fastlog.config.FastLogConfig;
-import com.zmh.fastlog.model.event.LogDisruptorEvent;
-import com.zmh.fastlog.model.message.AbstractMqMessage;
+import com.zmh.fastlog.model.message.ByteData;
 import com.zmh.fastlog.worker.Worker;
 import com.zmh.fastlog.worker.file.FileWorker;
 import com.zmh.fastlog.worker.log.LogWorker;
@@ -48,8 +47,8 @@ class WorkerRef<T> implements Worker<T> {
 
 class AppenderFacade implements Worker<Object> {
     private WorkerRef<Object> logWorker = new WorkerRef<>();
-    private WorkerRef<AbstractMqMessage> mqWorker = new WorkerRef<>();
-    private WorkerRef<LogDisruptorEvent> fileWorker = new WorkerRef<>();
+    private WorkerRef<ByteData> mqWorker = new WorkerRef<>();
+    private WorkerRef<ByteData> fileWorker = new WorkerRef<>();
 
     public AppenderFacade(FastLogConfig config) {
         try {

@@ -1,13 +1,13 @@
 package com.zmh.fastlog.worker.mq.producer;
 
-import com.zmh.fastlog.model.event.ByteDisruptorEvent;
+import com.zmh.fastlog.model.event.ByteDataSoftRef;
+import com.zmh.fastlog.model.message.ByteData;
 import lombok.SneakyThrows;
 import org.apache.pulsar.client.api.Producer;
 import org.apache.pulsar.client.api.PulsarClient;
 import org.apache.pulsar.client.api.PulsarClientException;
 import org.apache.pulsar.client.impl.TypedMessageBuilderImpl;
 
-import java.nio.ByteBuffer;
 import java.util.concurrent.ScheduledFuture;
 
 import static com.zmh.fastlog.utils.ScheduleUtils.scheduleWithFixedDelay;
@@ -88,12 +88,13 @@ public class PulsarProducer implements MqProducer {
     }
 
     @Override
-    public void sendEvent(ByteDisruptorEvent event) {
+    public void sendEvent(ByteDataSoftRef event) {
         TypedMessageBuilderImpl<byte[]> pulsarMessage = (TypedMessageBuilderImpl<byte[]>) producer.newMessage();
 
-        ByteBuffer buffer = event.getByteEvent().getBuffer();
-        pulsarMessage.value(buffer.array());
-        pulsarMessage.getContent().limit(buffer.position());
+        ByteData buffer = event.getByteData();
+
+        pulsarMessage.value(buffer.getData());
+        pulsarMessage.getContent().limit(buffer.getDataLength());
 
         pulsarMessage.sendAsync()
             .exceptionally(t -> {

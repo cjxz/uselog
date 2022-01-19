@@ -6,10 +6,9 @@ import ch.qos.logback.classic.LoggerContext;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.classic.spi.LoggingEvent;
 import com.google.common.util.concurrent.RateLimiter;
-import com.zmh.fastlog.model.event.LogDisruptorEvent;
-import com.zmh.fastlog.worker.Worker;
-import com.zmh.fastlog.model.message.AbstractMqMessage;
+import com.zmh.fastlog.model.message.ByteData;
 import com.zmh.fastlog.model.message.LastConfirmedSeq;
+import com.zmh.fastlog.worker.Worker;
 import lombok.SneakyThrows;
 import org.junit.Test;
 
@@ -17,7 +16,8 @@ import java.util.Objects;
 
 import static com.zmh.fastlog.utils.ThreadUtils.sleep;
 import static org.apache.pulsar.shade.org.apache.commons.lang3.reflect.FieldUtils.writeField;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
@@ -42,9 +42,9 @@ public class LogWorkerTest {
     @SuppressWarnings("unchecked")
     @Test
     public void toMqTest() {
-        Worker<AbstractMqMessage> mqWorker = mock(Worker.class);
+        Worker<ByteData> mqWorker = mock(Worker.class);
         when(mqWorker.sendMessage(any())).thenReturn(true);
-        Worker<LogDisruptorEvent> fileWorker = mock(Worker.class);
+        Worker<ByteData> fileWorker = mock(Worker.class);
 
         try (LogWorker logWorker = new LogWorker(mqWorker, fileWorker, 1024, 1024)) {
             when(fileWorker.sendMessage(any()))
@@ -52,9 +52,9 @@ public class LogWorkerTest {
                     System.out.println("send message:" + msg.getArgument(0));
                     // mock mq received this message
                     Object e = msg.getArgument(0);
-                    if (e instanceof AbstractMqMessage) {
-                        AbstractMqMessage abstractMqMessage = (AbstractMqMessage) e;
-                        long id = abstractMqMessage.getId();
+                    if (e instanceof ByteData) {
+                        ByteData byteData = (ByteData) e;
+                        long id = byteData.getId();
                         System.out.println("sync seq:" + id);
                         logWorker.sendMessage(new LastConfirmedSeq(id));
                     }
@@ -83,9 +83,9 @@ public class LogWorkerTest {
     @Test
     @SneakyThrows
     public void mqToFileTest() {
-        Worker<AbstractMqMessage> mqWorker = mock(Worker.class);
+        Worker<ByteData> mqWorker = mock(Worker.class);
         when(mqWorker.sendMessage(any())).thenReturn(false);
-        Worker<LogDisruptorEvent> fileWorker = mock(Worker.class);
+        Worker<ByteData> fileWorker = mock(Worker.class);
         when(fileWorker.sendMessage(any())).thenReturn(true);
 
         try (LogWorker logWorker = new LogWorker(mqWorker, fileWorker, 1024, 1024)) {
@@ -114,7 +114,7 @@ public class LogWorkerTest {
     public void missingCountTest() {
         RateLimiter limiter = RateLimiter.create(5000);
 
-        Worker<LogDisruptorEvent> fileWorker = mock(Worker.class);
+        Worker<ByteData> fileWorker = mock(Worker.class);
         when(fileWorker.sendMessage(any())).thenReturn(false);
 
         try (LogWorker logWorker = new LogWorker(mock(Worker.class), fileWorker, 128, 1024)) {

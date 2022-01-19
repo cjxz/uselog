@@ -27,17 +27,24 @@ public class JsonByteBuilder {
     private byte[] bufferArray;
     private int pos;
 
-    public static JsonByteBuilder create(int bufferLen) {
-        return new JsonByteBuilder(bufferLen);
+    public static JsonByteBuilder create() {
+        return new JsonByteBuilder();
     }
 
-    private JsonByteBuilder(int bufferLen) {
-        bufferLen = marginToBuffer(bufferLen);
-        this.bufferArray = new byte[bufferLen];
+    private JsonByteBuilder() {
         this.pos = 0;
     }
 
     public JsonByteBuilder beginObject() {
+        return beginObject(null);
+    }
+
+    public JsonByteBuilder beginObject(byte[] bytes) {
+        if (isNull(bytes)) {
+            bytes = new byte[2048];
+        }
+
+        this.bufferArray = bytes;
         addAscii((byte) '{');
         return this;
     }
@@ -72,13 +79,12 @@ public class JsonByteBuilder {
     public JsonByteBuilder value(String value, int maxLength) {
         if (isNull(value)) {
             writeString("null");
-            addAscii((byte) ',');
         } else {
             addAscii((byte) '"');
             writeString(value, Math.min(value.length(), maxLength));
             addAscii((byte) '"');
-            addAscii((byte) ',');
         }
+        addAscii((byte) ',');
         return this;
     }
 
@@ -117,20 +123,12 @@ public class JsonByteBuilder {
         return this;
     }
 
-    public int capacity() {
-        return bufferArray.length;
-    }
-
-    public int pos() {
-        return pos;
-    }
-
     public byte[] array() {
         return bufferArray;
     }
 
-    public void array(byte[] bufferArray) {
-        this.bufferArray = bufferArray;
+    public int pos() {
+        return pos;
     }
 
     public JsonByteBuilder clear() {

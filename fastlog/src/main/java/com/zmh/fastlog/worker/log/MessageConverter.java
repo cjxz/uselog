@@ -3,16 +3,20 @@ package com.zmh.fastlog.worker.log;
 import ch.qos.logback.classic.pattern.CallerDataConverter;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.classic.spi.ThrowableProxyUtil;
-import com.zmh.fastlog.utils.DateSequence;
+import com.zmh.fastlog.model.message.ByteData;
 import com.zmh.fastlog.utils.JsonByteBuilder;
 import org.apache.commons.lang3.time.FastDateFormat;
 
 import java.util.Map;
 
 import static com.zmh.fastlog.worker.log.MessageConverter.Consts.*;
+import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 
 public class MessageConverter {
+
+    private final ThreadLocal<JsonByteBuilder> threadLocal = new ThreadLocal<>();
+    private final FastDateFormat dateFormat = FastDateFormat.getInstance("yyyy-MM-dd HH:mm:ss.SSS");
 
     //最大的日志长度，单位字节，大于这个长度截取
     private final int maxMsgSize;
@@ -21,14 +25,12 @@ public class MessageConverter {
         this.maxMsgSize = maxMsgSize;
     }
 
-    // 使用雪花算法获取，用于最终给日志排序，保证日志的有序性
-    private final static DateSequence dataSeq = new DateSequence();
-    private final static FastDateFormat dateFormat = FastDateFormat.getInstance("yyyy-MM-dd HH:mm:ss.SSS");
+    public void convertToByteData(ILoggingEvent log, ByteData byteData, long sequence) {
+        JsonByteBuilder jsonByteBuilder = getJsonByteBuilder();
 
-    void convertToByteMessage(ILoggingEvent log, JsonByteBuilder jsonByteBuilder) {
         jsonByteBuilder.clear()
-            .beginObject()
-            .key(DATA_SEQ).value(dataSeq.next())
+            .beginObject(byteData.getData())
+            .key(DATA_SEQ).value(sequence)
             .key(DATA_MESSAGE).value(log.getFormattedMessage(), maxMsgSize)
             .key(DATA_LOGGER).value(log.getLoggerName())
             .key(DATA_THREAD).value(log.getThreadName())
@@ -60,6 +62,23 @@ public class MessageConverter {
         }
 
         jsonByteBuilder.endObject();
+
+        // 有可能data发生了扩容
+        byteData.setData(jsonByteBuilder.array());
+        byteData.setDataLength(jsonByteBuilder.pos());
+    }
+
+    /**
+     * 从当前线程中获取，避免多线程并发问题
+     */
+    private JsonByteBuilder getJsonByteBuilder() {
+        JsonByteBuilder jsonByteBuilder = this.threadLocal.get();
+
+        if (isNull(jsonByteBuilder)) {
+            jsonByteBuilder = JsonByteBuilder.create();
+            threadLocal.set(jsonByteBuilder);
+        }
+        return jsonByteBuilder;
     }
 
     @SuppressWarnings("unused")

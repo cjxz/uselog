@@ -1,13 +1,16 @@
 package com.zmh.fastlog.worker.log;
 
 import ch.qos.logback.classic.spi.ILoggingEvent;
-import com.lmax.disruptor.*;
+import com.lmax.disruptor.BatchStartAware;
+import com.lmax.disruptor.LiteBlockingWaitStrategy;
+import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
-import com.zmh.fastlog.model.event.LogDisruptorEvent;
-import com.zmh.fastlog.model.message.AbstractMqMessage;
+import com.zmh.fastlog.model.event.ByteDataSoftRef;
+import com.zmh.fastlog.model.message.ByteData;
 import com.zmh.fastlog.model.message.LastConfirmedSeq;
 import com.zmh.fastlog.utils.ThreadUtils;
+import com.zmh.fastlog.worker.AbstractWorker;
 import com.zmh.fastlog.worker.Worker;
 import lombok.Getter;
 import lombok.val;
@@ -21,10 +24,8 @@ import static org.apache.commons.lang3.StringUtils.startsWithAny;
 /**
  * @author zmh
  */
-public class LogWorker implements Worker<Object>,
-    EventHandler<LogDisruptorEvent>,
-    SequenceReportingEventHandler<LogDisruptorEvent>,
-    BatchStartAware {
+public class LogWorker extends AbstractWorker<Object, ByteDataSoftRef>
+    implements BatchStartAware {
 
     // 日志有两个可能方向, 一个往mq, 一个写本地文件缓存
     // 以下两个是高水位阈值, 日志堆积超过这个阈值后应该丢弃之前的日志,
@@ -37,8 +38,8 @@ public class LogWorker implements Worker<Object>,
     private final int highWaterLevelFile;
 
     // 日志缓冲区
-    private final Disruptor<LogDisruptorEvent> queue;
-    private final RingBuffer<LogDisruptorEvent> ringBuffer;
+    private final Disruptor<ByteDataSoftRef> queue;
+    private final RingBuffer<ByteDataSoftRef> ringBuffer;
 
     // 统计丢弃的日志数
     final LogMissingCountAndPrint logMissingCount = new LogMissingCountAndPrint("log");
@@ -48,15 +49,15 @@ public class LogWorker implements Worker<Object>,
     // 初始时先通过file,file缓冲区为空的切到mq
     // mq堵塞的时候切到file缓存
     private boolean directWriteToMq = false;
-    private final Worker<AbstractMqMessage> mqWorker;
-    private final Worker<LogDisruptorEvent> fileWorker;
+    private final Worker<ByteData> mqWorker;
+    private final Worker<ByteData> fileWorker;
 
     // 日志序列化类
     private MessageConverter messageConverter;
 
     private volatile boolean isClosed = false;
 
-    public LogWorker(Worker<AbstractMqMessage> mqWorker, Worker<LogDisruptorEvent> fileWorker, int batchSize, int maxMsgSize) {
+    public LogWorker(Worker<ByteData> mqWorker, Worker<ByteData> fileWorker, int batchSize, int maxMsgSize) {
         this.messageConverter = new MessageConverter(maxMsgSize);
         this.mqWorker = mqWorker;
         this.fileWorker = fileWorker;
@@ -68,7 +69,7 @@ public class LogWorker implements Worker<Object>,
         this.highWaterLevelMq = bufferSize >> 1;
 
         queue = new Disruptor<>(
-            LogDisruptorEvent::new,
+            ByteDataSoftRef::new,
             bufferSize,
             namedDaemonThreadFactory("log-log-worker"),
             ProducerType.MULTI, // 注意此处为多生产者
@@ -87,14 +88,14 @@ public class LogWorker implements Worker<Object>,
      */
     @SuppressWarnings("CodeBlock2Expr")
     @Override
-    public boolean sendMessage(Object message) {
+    protected boolean enqueue(Object message) {
         if (message instanceof ILoggingEvent) {
             val msg = (ILoggingEvent) message;
             if (isExclude(msg)) {
                 return true;
             }
             if (!ringBuffer.tryPublishEvent((event, sequence) -> {
-                messageConverter.convertToByteMessage(msg, event.getByteBuilder());
+                messageConverter.convertToByteData(msg, event.getByteData(), sequence);
             })) {
                 logMissingCount.increment();
                 return false;
@@ -117,14 +118,16 @@ public class LogWorker implements Worker<Object>,
     private long lastMessageId = 0;
 
     // ringbuffer的消费者逻辑，这里已经是单线程了，lastMessageId没有并发问题
-    public void onEvent(LogDisruptorEvent event, long sequence, boolean endOfBatch) {
+    @Override
+    protected void dequeue(ByteDataSoftRef event, long sequence, boolean endOfBatch) {
         long messageId = lastMessageId + 1;
-        event.setId(messageId);
+
+        ByteData byteData = event.getByteData();
+        byteData.setId(messageId);
 
         boolean success = false;
-
         if (directWriteToMq) {
-            while (!(success = mqWorker.sendMessage(event))) {
+            while (!(success = mqWorker.sendMessage(byteData))) {
                 if (isClosed) {
                     break;
                 }
@@ -141,7 +144,7 @@ public class LogWorker implements Worker<Object>,
         }
 
         if (!directWriteToMq) {
-            while (!(success = fileWorker.sendMessage(event))) {
+            while (!(success = fileWorker.sendMessage(byteData))) {
                 if (isClosed) {
                     break;
                 }
@@ -181,13 +184,6 @@ public class LogWorker implements Worker<Object>,
         fileMissingCount.close();
         isClosed = true;
         queue.shutdown();
-    }
-
-    private Sequence sequenceCallback;
-
-    @Override
-    public void setSequenceCallback(Sequence sequenceCallback) {
-        this.sequenceCallback = sequenceCallback;
     }
 
     private long nextNotifySeq = 0;

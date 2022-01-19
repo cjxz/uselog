@@ -1,15 +1,12 @@
 package com.zmh.fastlog.worker.file;
 
-import com.zmh.fastlog.model.event.ByteEvent;
-import com.zmh.fastlog.model.message.AbstractMqMessage;
-import com.zmh.fastlog.model.message.FileMqMessage;
+import com.zmh.fastlog.model.message.ByteData;
 import io.appulse.utils.Bytes;
 import io.appulse.utils.ReadBytesUtils;
 import io.appulse.utils.WriteBytesUtils;
 import lombok.*;
 import org.apache.commons.lang3.time.StopWatch;
 
-import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -70,8 +67,8 @@ public class FIFOQueue implements AutoCloseable {
         head = new BytesCacheQueue(cacheSize);
     }
 
-    public void put(ByteEvent byteBuffer) {
-        if (tail.put(byteBuffer)) {
+    public void put(ByteData byteData) {
+        if (tail.put(byteData)) {
             return;
         }
 
@@ -82,31 +79,31 @@ public class FIFOQueue implements AutoCloseable {
             flush();
         }
 
-        tail.put(byteBuffer);
+        tail.put(byteData);
     }
 
-    private AbstractMqMessage currentMessage;
+    private ByteData current;
 
-    public AbstractMqMessage get() {
-        if (isNull(currentMessage)) {
+    public ByteData get() {
+        if (isNull(current)) {
             next();
         }
-        return currentMessage;
+        return current;
     }
 
     public void next() {
-        currentMessage = head.get();
-        if (nonNull(currentMessage)) {
+        current = head.get();
+        if (nonNull(current)) {
             return;
         }
 
         if (fileSize() > 0) {
             logFiles.pollTo(head.getBytes());
-            currentMessage = head.get();
+            current = head.get();
             return;
         }
 
-        currentMessage = tail.get();
+        current = tail.get();
     }
 
     // for test
@@ -158,11 +155,11 @@ class TwoBytesCacheQueue {
         other = temp;
     }
 
-    public boolean put(ByteEvent event) {
-        return this.used.getQueue().put(event);
+    public boolean put(ByteData byteData) {
+        return this.used.getQueue().put(byteData);
     }
 
-    public FileMqMessage get() {
+    public ByteData get() {
         return this.used.getQueue().get();
     }
 
@@ -217,22 +214,21 @@ class BytesCacheQueue {
         this.bytes = Bytes.allocate(size);
     }
 
-    public boolean put(ByteEvent event) {
-        ByteBuffer bb = event.getBuffer();
-
-        if (this.bytes.writerIndex() + Long.BYTES + Integer.BYTES + bb.limit() > bytes.capacity()) {
+    public boolean put(ByteData byteData) {
+        int dataLength = byteData.getDataLength();
+        if (this.bytes.writerIndex() + Long.BYTES + Integer.BYTES + dataLength > bytes.capacity()) {
             return false;
         }
 
-        this.bytes.write4B(bb.limit()); //日志的长度 单位：字节
-        this.bytes.write8B(event.getId());
-        this.bytes.writeNB(bb.array(), 0 ,bb.limit());
+        this.bytes.write4B(dataLength); //日志的长度 单位：字节
+        this.bytes.write8B(byteData.getId());
+        this.bytes.writeNB(byteData.getData(), 0, dataLength);
         return true;
     }
 
     private byte[] readBuffer = new byte[5120];
 
-    public FileMqMessage get() {
+    public ByteData get() {
         if (bytes.readableBytes() == 0) {
             this.bytes.reset();
             return null;
@@ -245,7 +241,7 @@ class BytesCacheQueue {
             long id = this.bytes.readLong();
             this.bytes.readBytes(readBuffer, 0, readCount);
 
-            return new FileMqMessage(id, readBuffer, readCount);
+            return new ByteData(id, readBuffer, readCount);
         } else {
             debugLog("fastlog BytesCacheQueue readCount error " + readCount);
             this.bytes.reset();
@@ -335,7 +331,7 @@ class LogFiles implements AutoCloseable {
     }
 
     public int getFileSize() {
-        return files.getFilesFromQueue().size();
+        return files.getFileSize();
     }
 
     @Override
@@ -394,8 +390,8 @@ class FilesManager implements AutoCloseable {
         queue.clear();
     }
 
-    Queue<Path> getFilesFromQueue() {
-        return queue;
+    public int getFileSize() {
+        return queue.size();
     }
 
     @SneakyThrows

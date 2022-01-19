@@ -1,6 +1,6 @@
 package com.zmh.fastlog.worker.mq;
 
-import com.zmh.fastlog.model.message.FileMqMessage;
+import com.zmh.fastlog.model.message.ByteData;
 import com.zmh.fastlog.model.message.LastConfirmedSeq;
 import com.zmh.fastlog.utils.ThreadUtils;
 import com.zmh.fastlog.worker.log.LogWorker;
@@ -27,8 +27,8 @@ public class MqWorkerTest {
         LogWorker logWorker = Mockito.mock(LogWorker.class);
 
         try (MqWorker pulsarWorker = new MqWorker(logWorker, new KafkaProducer("", "", 10), 10)) {
-            pulsarWorker.sendMessage(new FileMqMessage(10, new byte[13], 10));
-            pulsarWorker.sendMessage(new FileMqMessage(11, new byte[13], 10));
+            pulsarWorker.sendMessage(new ByteData(10, new byte[13], 10));
+            pulsarWorker.sendMessage(new ByteData(11, new byte[13], 10));
 
             ThreadUtils.sleep(10000);
             assertNotNull(readField(pulsarWorker, "producer", true));

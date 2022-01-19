@@ -42,7 +42,7 @@ public class JsonCharAndByteBuilderPerformanceTest {
         StopWatch stopWatch = new StopWatch();
         String value = getText(100);
 
-        JsonByteBuilder jsonByteBuilder = JsonByteBuilder.create(1024);
+        JsonByteBuilder jsonByteBuilder = JsonByteBuilder.create();
         yure1(jsonByteBuilder);
         stopWatch.start();
         for (int i = 0; i < 10; i++) {
