@@ -1,71 +1,73 @@
 package com.zmh.fastlog.worker.file;
 
-import org.junit.Before;
 import org.junit.Test;
 
-import java.io.File;
 import java.nio.file.Paths;
 
-import static java.util.Objects.isNull;
 import static org.junit.Assert.assertEquals;
 
-public class IndexFileTest {
-
-    @Before
-    public void before() {
-        deleteFile(new File("logs/cache"));
-    }
+public class IndexFileTest extends BeforeDeleteFile {
 
     @Test
-    public void testIndexFile() {
-        IndexFile indexFile = new IndexFile(Paths.get("logs/cache"), 1);
-        assertEquals(0, indexFile.readIndex(0));
-        assertEquals(0, indexFile.writeIndex(0));
+    public void testIndexFileWriteAndReadSingleTime() {
+        try (IndexFile indexFile = new IndexFile(Paths.get("logs/cache"), 1)) {
+            assertEquals(0, indexFile.readIndex(0));
+            assertEquals(0, indexFile.writeIndex(0));
 
-        indexFile.write(0, 56);
-        assertEquals(56, indexFile.writeIndex(0));
+            indexFile.write(0, 56);
+            assertEquals(56, indexFile.writeIndex(0));
 
-        indexFile.read(0, 8);
-        assertEquals(8, indexFile.readIndex(0));
+            indexFile.read(0, 8);
+            assertEquals(8, indexFile.readIndex(0));
+        }
     }
 
     @Test
     public void testIndexFileOverSize() {
-        IndexFile indexFile = new IndexFile(Paths.get("logs/cache"), 2);
-        assertEquals(0, indexFile.readIndex(0));
-        assertEquals(0, indexFile.writeIndex(0));
+        try (IndexFile indexFile = new IndexFile(Paths.get("logs/cache"), 2)) {
+            assertEquals(0, indexFile.readIndex(2));
+            assertEquals(0, indexFile.writeIndex(2));
 
-        indexFile.write(0, 56);
-        assertEquals(56, indexFile.writeIndex(0));
+            indexFile.write(1, 24);
+            indexFile.read(1, 24);
+            assertEquals(24, indexFile.writeIndex(1));
+            assertEquals(24, indexFile.readIndex(1));
 
-        indexFile.read(0, 8);
-        assertEquals(8, indexFile.readIndex(0));
+            indexFile.write(2, 56);
+            indexFile.read(2, 8);
+            assertEquals(56, indexFile.writeIndex(2));
+            assertEquals(8, indexFile.readIndex(2));
+        }
     }
 
-    @SuppressWarnings("ResultOfMethodCallIgnored")
-    private void deleteFile(File file) {
-        //判断文件不为null或文件目录存在
-        if (isNull(file) || !file.exists()) {
-            return;
+    @Test
+    public void testIndexFileWriteAndReadManyTime() {
+        try (IndexFile indexFile = new IndexFile(Paths.get("logs/cache"), 1)) {
+            indexFile.write(1, 24);
+            indexFile.write(1, 16);
+            assertEquals(40, indexFile.writeIndex(1));
+
+            indexFile.read(1, 8);
+            indexFile.read(1, 16);
+            assertEquals(24, indexFile.readIndex(1));
+        }
+    }
+
+    @Test
+    public void closeAndReRead() {
+        try (IndexFile indexFile = new IndexFile(Paths.get("logs/cache"), 1)) {
+            indexFile.write(1, 24);
+            indexFile.write(1, 16);
+            assertEquals(40, indexFile.writeIndex(1));
+
+            indexFile.read(1, 8);
+            indexFile.read(1, 16);
+            assertEquals(24, indexFile.readIndex(1));
         }
 
-        //取得这个目录下的所有子文件对象
-        File[] files = file.listFiles();
-        if (isNull(files)) {
-            return;
-        }
-
-        //遍历该目录下的文件对象
-        for (File f : files) {
-            //打印文件名
-            String name = f.getName();
-            System.out.println("delete:" + name);
-            //判断子目录是否存在子目录,如果是文件则删除
-            if (f.isDirectory()) {
-                deleteFile(f);
-            } else {
-                f.delete();
-            }
+        try (IndexFile indexFile = new IndexFile(Paths.get("logs/cache"), 1)) {
+            assertEquals(40, indexFile.writeIndex(1));
+            assertEquals(24, indexFile.readIndex(1));
         }
     }
 

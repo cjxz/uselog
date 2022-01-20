@@ -6,6 +6,7 @@ public class TestDate {
 
     @Test
     public void test() {
+        System.out.println(1 << 20);
     }
 }
 

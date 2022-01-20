@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.NonNull;
 import lombok.SneakyThrows;
 
+import java.io.Closeable;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
@@ -13,8 +14,9 @@ import java.nio.channels.FileChannel.MapMode;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import static com.zmh.fastlog.utils.Utils.debugLog;
-import static com.zmh.fastlog.utils.Utils.marginToBuffer;
+import static com.zmh.fastlog.utils.Utils.*;
+import static java.nio.file.StandardOpenOption.READ;
+import static java.nio.file.StandardOpenOption.WRITE;
 import static java.util.Objects.isNull;
 
 public class FIFOFile {
@@ -74,7 +76,7 @@ public class FIFOFile {
     }
 }
 
-class ReadWriteFile {
+class ReadWriteFile implements Closeable {
     @Getter
     private Path path;
     private IndexFile indexFile;
@@ -85,14 +87,14 @@ class ReadWriteFile {
     private int index;
 
     public ReadWriteFile(Path path, IndexFile indexFile, long capacity, int index) {
-        new ReadWriteFile(path, indexFile, indexFile.readIndex(index), indexFile.writeIndex(index), capacity, index);
+        this(path, indexFile, indexFile.readIndex(index), indexFile.writeIndex(index), capacity, index);
     }
 
     @SneakyThrows
     public ReadWriteFile(Path path, IndexFile indexFile, long readIndex, long writeIndex, long capacity, int index) {
         this.path = path;
         this.indexFile = indexFile;
-        this.channel = FileChannel.open(path);
+        this.channel = FileChannel.open(path, WRITE, READ);
         this.readIndex = readIndex;
         this.writeIndex = writeIndex;
         this.capacity = capacity;
@@ -100,8 +102,9 @@ class ReadWriteFile {
     }
 
     private ByteBuffer lenBuffer = ByteBuffer.allocate(4);
-
     private ByteBuffer idBuffer = ByteBuffer.allocate(8);
+    private ByteBuffer readByteBuffer = ByteBuffer.allocate(2048);
+
 
     public boolean write(ByteData byteData) {
         int len = byteData.getDataLength();
@@ -109,9 +112,11 @@ class ReadWriteFile {
             return false;
         }
 
+        lenBuffer.clear();
         lenBuffer.putInt(len);
         writeByteBuffer(lenBuffer, 32);
 
+        idBuffer.clear();
         idBuffer.putLong(byteData.getId());
         writeByteBuffer(idBuffer, 64);
 
@@ -144,12 +149,26 @@ class ReadWriteFile {
 
     @SneakyThrows
     private void writeByteBuffer(ByteBuffer buffer, int len) {
-        this.channel.write(buffer, writeIndex % capacity);
-        writeIndex += len;
-        indexFile.write(index, len);
-    }
+        buffer.rewind();
 
-    private ByteBuffer readByteBuffer = ByteBuffer.allocate(2048);
+        long position = writeIndex % capacity;
+        if (position + len < capacity) {
+            this.channel.write(buffer, position);
+        } else {
+            int cut = (int)(capacity - position) >> 3;
+
+            ByteBuffer onePart = ByteBuffer.wrap(buffer.array(), 0, cut);
+            this.channel.write(onePart, position);
+
+            ByteBuffer twoPart = ByteBuffer.wrap(buffer.array(), cut, len << 3 - cut);
+            this.channel.write(twoPart, 0);
+        }
+
+        writeIndex += len;
+        indexFile.write(this.index, len);
+
+        buffer.clear();
+    }
 
     @SneakyThrows
     private boolean readByteBuffer(ByteBuffer buffer, int len) {
@@ -157,19 +176,39 @@ class ReadWriteFile {
             return false;
         }
 
-        this.channel.read(buffer, readIndex % capacity);
+        buffer.clear();
+
+        long position = readIndex % capacity;
+        if (index + len < capacity) {
+            this.channel.read(buffer, position);
+        } else {
+            int cut = (int)(capacity - position) >> 3;
+
+
+            this.channel.read(buffer, position);
+            this.channel.read(buffer, 0);
+        }
+
         readIndex += len;
-        indexFile.read(index, len);
+        indexFile.read(this.index, len);
+
+        buffer.flip();
         return true;
     }
 
+    @Override
+    public void close() {
+        indexFile.close();
+        safeClose(channel);
+    }
 }
 
 
-class IndexFile {
+class IndexFile implements Closeable {
 
     private MappedByteBuffer mbb;
     private int maxFileSize;
+    private RandomAccessFile raf;
 
     @SneakyThrows
     public IndexFile(Path folder, int maxFileSize) {
@@ -179,30 +218,33 @@ class IndexFile {
             Files.createFile(indexPath);
         }
 
-        RandomAccessFile raf = new RandomAccessFile(indexPath.toFile(), "rwd");
-        FileChannel channel = raf.getChannel();
+        this.raf = new RandomAccessFile(indexPath.toFile(), "rwd");
 
         //把文件映射到内存
-        this.mbb = channel.map(MapMode.READ_WRITE, 0, maxFileSize * 64);
+        this.mbb = this.raf.getChannel().map(MapMode.READ_WRITE, 0, maxFileSize * 64);
         this.maxFileSize = maxFileSize;
     }
 
     public void write(int fileIndex, int len) {
-        int index = ((fileIndex % maxFileSize) << 8) + 32;
+        int index = ((fileIndex % maxFileSize) << 6) + 32;
         mbb.putInt(index, mbb.getInt(index) + len);
     }
 
     public void read(int fileIndex, int len) {
-        int index = (fileIndex % maxFileSize) << 8;
+        int index = (fileIndex % maxFileSize) << 6;
         mbb.putInt(index, mbb.getInt(index) + len);
     }
 
     public int readIndex(int fileIndex) {
-        return mbb.getInt((fileIndex % maxFileSize) << 8);
+        return mbb.getInt((fileIndex % maxFileSize) << 6);
     }
 
     public int writeIndex(int fileIndex) {
-        return mbb.getInt(((fileIndex % maxFileSize) << 8) + 32);
+        return mbb.getInt(((fileIndex % maxFileSize) << 6) + 32);
     }
 
+    @Override
+    public void close() {
+        safeClose(raf);
+    }
 }

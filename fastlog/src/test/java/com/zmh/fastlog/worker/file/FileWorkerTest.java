@@ -5,17 +5,13 @@ import com.zmh.fastlog.utils.ThreadUtils;
 import lombok.SneakyThrows;
 import org.apache.commons.lang3.RandomUtils;
 import org.apache.commons.lang3.time.StopWatch;
-import org.junit.After;
-import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
 
-import java.io.File;
 import java.util.Arrays;
 import java.util.Random;
 import java.util.concurrent.TimeUnit;
 
-import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.junit.Assert.*;
 
@@ -45,12 +41,6 @@ public class FileWorkerTest {
             System.out.println(watch.formatTime());
             System.out.println(1000 / watch.getTime(TimeUnit.SECONDS));
         }
-    }
-
-    @After
-    @Before
-    public void after() {
-        deleteFile(new File("logs/cache"));
     }
 
     private String getText(int size) {
@@ -124,33 +114,6 @@ public class FileWorkerTest {
                 fifoFile.next();
             }
             assertEquals(100 * 1_0000 - read, size);
-        }
-    }
-
-    @SuppressWarnings("ResultOfMethodCallIgnored")
-    private void deleteFile(File file) {
-        //判断文件不为null或文件目录存在
-        if (isNull(file) || !file.exists()) {
-            return;
-        }
-
-        //取得这个目录下的所有子文件对象
-        File[] files = file.listFiles();
-        if (isNull(files)) {
-            return;
-        }
-
-        //遍历该目录下的文件对象
-        for (File f : files) {
-            //打印文件名
-            String name = f.getName();
-            System.out.println("delete:" + name);
-            //判断子目录是否存在子目录,如果是文件则删除
-            if (f.isDirectory()) {
-                deleteFile(f);
-            } else {
-                f.delete();
-            }
         }
     }
 
