@@ -1,5 +1,7 @@
 package com.zmh.fastlog.worker.file;
 
+import com.zmh.fastlog.worker.BeforeDeleteFile;
+import com.zmh.fastlog.worker.file.fifo.IndexFile;
 import org.junit.Test;
 
 import java.nio.file.Paths;
@@ -10,7 +12,7 @@ public class IndexFileTest extends BeforeDeleteFile {
 
     @Test
     public void testIndexFileWriteAndReadSingleTime() {
-        try (IndexFile indexFile = new IndexFile(Paths.get("logs/cache"), 1)) {
+        try (IndexFile indexFile = new IndexFile(Paths.get("logs/cache"))) {
             assertEquals(0, indexFile.readIndex(0));
             assertEquals(0, indexFile.writeIndex(0));
 
@@ -24,7 +26,7 @@ public class IndexFileTest extends BeforeDeleteFile {
 
     @Test
     public void testIndexFileOverSize() {
-        try (IndexFile indexFile = new IndexFile(Paths.get("logs/cache"), 2)) {
+        try (IndexFile indexFile = new IndexFile(Paths.get("logs/cache"))) {
             assertEquals(0, indexFile.readIndex(2));
             assertEquals(0, indexFile.writeIndex(2));
 
@@ -42,7 +44,7 @@ public class IndexFileTest extends BeforeDeleteFile {
 
     @Test
     public void testIndexFileWriteAndReadManyTime() {
-        try (IndexFile indexFile = new IndexFile(Paths.get("logs/cache"), 1)) {
+        try (IndexFile indexFile = new IndexFile(Paths.get("logs/cache"))) {
             indexFile.write(1, 24);
             indexFile.write(1, 16);
             assertEquals(40, indexFile.writeIndex(1));
@@ -55,7 +57,7 @@ public class IndexFileTest extends BeforeDeleteFile {
 
     @Test
     public void closeAndReRead() {
-        try (IndexFile indexFile = new IndexFile(Paths.get("logs/cache"), 1)) {
+        try (IndexFile indexFile = new IndexFile(Paths.get("logs/cache"))) {
             indexFile.write(1, 24);
             indexFile.write(1, 16);
             assertEquals(40, indexFile.writeIndex(1));
@@ -65,7 +67,7 @@ public class IndexFileTest extends BeforeDeleteFile {
             assertEquals(24, indexFile.readIndex(1));
         }
 
-        try (IndexFile indexFile = new IndexFile(Paths.get("logs/cache"), 1)) {
+        try (IndexFile indexFile = new IndexFile(Paths.get("logs/cache"))) {
             assertEquals(40, indexFile.writeIndex(1));
             assertEquals(24, indexFile.readIndex(1));
         }

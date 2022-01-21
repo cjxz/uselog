@@ -1,6 +1,9 @@
 package com.zmh.fastlog.worker.file;
 
 import com.zmh.fastlog.model.message.ByteData;
+import com.zmh.fastlog.worker.BeforeDeleteFile;
+import com.zmh.fastlog.worker.file.fifo.IndexFile;
+import com.zmh.fastlog.worker.file.fifo.ReadWriteFile;
 import lombok.SneakyThrows;
 import org.junit.Test;
 
@@ -19,7 +22,7 @@ public class ReadWriteFileTest extends BeforeDeleteFile {
         Path logFile = Paths.get("logs/cache/index-1.log");
         Files.createFile(logFile);
 
-        IndexFile indexFile = new IndexFile(Paths.get("logs/cache"), 1);
+        IndexFile indexFile = new IndexFile(Paths.get("logs/cache"));
         try (ReadWriteFile rwf = new ReadWriteFile(logFile, indexFile, 1 << 20, 1)) {
             byte[] bytes = new byte[128];
             Arrays.fill(bytes, (byte) 40);
@@ -44,7 +47,7 @@ public class ReadWriteFileTest extends BeforeDeleteFile {
         Path logFile = Paths.get("logs/cache/index-1.log");
         Files.createFile(logFile);
 
-        IndexFile indexFile = new IndexFile(Paths.get("logs/cache"), 1);
+        IndexFile indexFile = new IndexFile(Paths.get("logs/cache"));
         try (ReadWriteFile rwf = new ReadWriteFile(logFile, indexFile, 1 << 20, 1)) {
             byte[] bytes = new byte[128];
             Arrays.fill(bytes, (byte) 40);
@@ -76,8 +79,8 @@ public class ReadWriteFileTest extends BeforeDeleteFile {
         Path logFile = Paths.get("logs/cache/index-1.log");
         Files.createFile(logFile);
 
-        IndexFile indexFile = new IndexFile(Paths.get("logs/cache"), 1);
-        try (ReadWriteFile rwf = new ReadWriteFile(logFile, indexFile, 8192, 1)) {
+        IndexFile indexFile = new IndexFile(Paths.get("logs/cache"));
+        try (ReadWriteFile rwf = new ReadWriteFile(logFile, indexFile, 1024, 1)) {
             byte[] bytes = new byte[128];
             Arrays.fill(bytes, (byte) 40);
 
@@ -109,8 +112,8 @@ public class ReadWriteFileTest extends BeforeDeleteFile {
         Path logFile = Paths.get("logs/cache/index-1.log");
         Files.createFile(logFile);
 
-        IndexFile indexFile = new IndexFile(Paths.get("logs/cache"), 1);
-        try (ReadWriteFile rwf = new ReadWriteFile(logFile, indexFile, 8192, 1)) {
+        IndexFile indexFile = new IndexFile(Paths.get("logs/cache"));
+        try (ReadWriteFile rwf = new ReadWriteFile(logFile, indexFile, 1024, 1)) {
             byte[] bytes = new byte[128];
             Arrays.fill(bytes, (byte) 40);
 
@@ -123,19 +126,22 @@ public class ReadWriteFileTest extends BeforeDeleteFile {
                 rwf.write(byteData);
             }
 
-            for (int i = 0; i < 10; i++) {
+            for (int i = 1; i < 10; i++) {
                 rwf.read();
             }
 
             for (int i = 1; i < 10; i++) {
                 byteData.setId(i);
+                byteData.setDataLength(i * 10);
                 boolean write = rwf.write(byteData);
                 assertTrue(write);
             }
 
-            for (int i = 0; i < 10; i++) {
+            for (int i = 1; i < 10; i++) {
                 ByteData read = rwf.read();
                 assertNotNull(read);
+                assertEquals(i, read.getId());
+                assertEquals(i * 10, read.getDataLength());
             }
         }
     }

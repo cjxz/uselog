@@ -1,4 +1,4 @@
-package com.zmh.fastlog.worker.file;
+package com.zmh.fastlog.worker;
 
 import org.junit.Before;
 

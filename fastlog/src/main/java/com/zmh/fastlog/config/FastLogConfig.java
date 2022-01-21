@@ -1,6 +1,9 @@
 package com.zmh.fastlog.config;
 
+import ch.qos.logback.core.util.FileSize;
 import lombok.Data;
+
+import static com.zmh.fastlog.utils.Utils.debugLog;
 
 /**
  * fastlog配置信息，FastLogConfig的赋值由logbook实现，配置文件地址在 resources/fastlog-base.xml
@@ -41,12 +44,14 @@ public class FastLogConfig {
      * 默认：64 * 1024 * 1024 即 64MB
      */
     private int fileMemoryCacheSize;
+
+    private long totalSizeCap;
     /**
      * 最多能有多少个日志文件，每个日志文件的大小就是fileMemoryCacheSize的大小，也就是磁盘最多能占用maxFileCount * fileMemoryCacheSize的大小，
      * 超过这个数量，则删除最老的日志文件
-     *
+     * <p>
      * 默认：100 （也就是默认磁盘最多占用 100 * 64MB = 6.4GB）
-     *
+     * <p>
      * 假设mq挂了，日志的收集速度是40w/QPS，每条日志的大小是512字节，那么磁盘占满需要 6.4GB / (512 * 40w) ≈ 33秒 // todo zmh 33秒太短了？？
      */
     private int maxFileCount;
@@ -63,7 +68,7 @@ public class FastLogConfig {
      * 所以Kafka做异步发送用于缓存消息的内存大小是 64kB * kafkaPartition。
      * 由于fastlog中kafka总体内存使用大小使用kafka的默认配置是32MB，其中要留存部分内存用于kafka消息压缩等，可供缓存消息的内存设置最大为10MB，
      * 所以不管batchMessageSize 和 kafkaPartition 如何配置，相乘后的数值不能大于10MB
-     *
+     * <p>
      * pulsar的batchsize单位是日志条数
      */
     public int getBatchSize() {
@@ -77,6 +82,15 @@ public class FastLogConfig {
             return messageBufferSize / kafkaPartition;
         } else {
             return batchMessageSize;
+        }
+    }
+
+    public void setTotalSizeCap(FileSize fileSize) {
+        debugLog("setting totalSizeCap to " + fileSize.toString());
+        this.totalSizeCap = fileSize.getSize();
+
+        if (Long.bitCount(totalSizeCap) != 1) {
+            throw new IllegalArgumentException("totalSizeCap must be a power of 2");
         }
     }
 }
