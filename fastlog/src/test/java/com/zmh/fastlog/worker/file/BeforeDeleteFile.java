@@ -1,6 +1,5 @@
 package com.zmh.fastlog.worker.file;
 
-import org.junit.After;
 import org.junit.Before;
 
 import java.io.File;

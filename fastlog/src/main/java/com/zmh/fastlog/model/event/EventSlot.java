@@ -8,7 +8,7 @@ import java.lang.ref.SoftReference;
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 
-public class ByteDataSoftRef {
+public class EventSlot {
     private SoftReference<ByteData> softRef = new SoftReference<>(new ByteData());
 
     private ByteData refKeep;

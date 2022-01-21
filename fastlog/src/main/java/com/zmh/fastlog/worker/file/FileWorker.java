@@ -6,33 +6,33 @@ import com.lmax.disruptor.SequenceReportingEventHandler;
 import com.lmax.disruptor.TimeoutHandler;
 import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
-import com.zmh.fastlog.model.event.ByteDataSoftRef;
+import com.zmh.fastlog.model.event.EventSlot;
 import com.zmh.fastlog.model.message.ByteData;
 import com.zmh.fastlog.worker.AbstractWorker;
-import com.zmh.fastlog.worker.Worker;
+import com.zmh.fastlog.worker.mq.MqWorker;
 
 import static com.zmh.fastlog.utils.ThreadUtils.namedDaemonThreadFactory;
 import static java.util.Objects.nonNull;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
-public class FileWorker extends AbstractWorker<ByteData, ByteDataSoftRef>
-    implements SequenceReportingEventHandler<ByteDataSoftRef>, TimeoutHandler {
+public class FileWorker extends AbstractWorker<ByteData, EventSlot>
+    implements SequenceReportingEventHandler<EventSlot>, TimeoutHandler {
 
-    private final Worker<ByteData> mqWorker;
-    private final Disruptor<ByteDataSoftRef> queue;
-    private final RingBuffer<ByteDataSoftRef> ringBuffer;
+    private final MqWorker mqWorker;
+    private final Disruptor<EventSlot> queue;
+    private final RingBuffer<EventSlot> ringBuffer;
     private final FIFOQueue fifo;
     private static final int BUFFER_SIZE = 512;
     private static final int HIGH_WATER_LEVEL_FILE = BUFFER_SIZE >> 1;
 
     private volatile boolean isClose;
 
-    public FileWorker(Worker<ByteData> mqWorker, int cacheSize, int maxFileCount, String folder) {
+    public FileWorker(MqWorker mqWorker, int cacheSize, int maxFileCount, String folder) {
         fifo = new FIFOQueue(cacheSize, maxFileCount, folder);
 
         this.mqWorker = mqWorker;
         queue = new Disruptor<>(
-            ByteDataSoftRef::new,
+            EventSlot::new,
             BUFFER_SIZE,
             namedDaemonThreadFactory("log-file-worker"),
             ProducerType.SINGLE,
@@ -44,12 +44,12 @@ public class FileWorker extends AbstractWorker<ByteData, ByteDataSoftRef>
     }
 
     @Override
-    protected boolean enqueue(ByteData byteData) {
+    public boolean enqueue(ByteData byteData) {
         return ringBuffer.tryPublishEvent((e, s) -> byteData.switchData(e.getByteData()));
     }
 
     @Override
-    public void dequeue(ByteDataSoftRef event, long sequence, boolean endOfBatch) {
+    public void dequeue(EventSlot event, long sequence, boolean endOfBatch) {
         fifo.put(event.getByteData());
         event.clear();
 
@@ -64,7 +64,7 @@ public class FileWorker extends AbstractWorker<ByteData, ByteDataSoftRef>
     public void onTimeout(long sequence) {
         ByteData message;
         while (ringBuffer.getCursor() - sequence <= HIGH_WATER_LEVEL_FILE && nonNull(message = fifo.get())) {
-            if (isClose || !mqWorker.sendMessage(message)) {
+            if (isClose || !mqWorker.enqueue(message)) {
                 return;
             }
             fifo.next();

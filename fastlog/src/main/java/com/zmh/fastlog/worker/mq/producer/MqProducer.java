@@ -1,12 +1,12 @@
 package com.zmh.fastlog.worker.mq.producer;
 
-import com.zmh.fastlog.model.event.ByteDataSoftRef;
+import com.zmh.fastlog.model.event.EventSlot;
 
 public interface MqProducer extends AutoCloseable {
 
     void connect();
 
-    void sendEvent(ByteDataSoftRef event);
+    void sendEvent(EventSlot event);
 
     boolean isReady();
 

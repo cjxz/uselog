@@ -26,14 +26,16 @@ public class MqWorkerTest {
     public void onEventTest() {
         LogWorker logWorker = Mockito.mock(LogWorker.class);
 
-        try (MqWorker pulsarWorker = new MqWorker(logWorker, new KafkaProducer("", "", 10), 10)) {
-            pulsarWorker.sendMessage(new ByteData(10, new byte[13], 10));
-            pulsarWorker.sendMessage(new ByteData(11, new byte[13], 10));
+        try (MqWorker mqWorker = new MqWorker(new KafkaProducer("", "", 10), 10)) {
+            mqWorker.registerLogWorker(logWorker);
+
+            mqWorker.enqueue(new ByteData(10, new byte[13], 10));
+            mqWorker.enqueue(new ByteData(11, new byte[13], 10));
 
             ThreadUtils.sleep(10000);
-            assertNotNull(readField(pulsarWorker, "producer", true));
+            assertNotNull(readField(mqWorker, "producer", true));
 
-            verify(logWorker, atLeastOnce()).sendMessage(argThat(msg -> ((LastConfirmedSeq) msg).getSeq() == 11));
+            verify(logWorker, atLeastOnce()).enqueue(argThat(msg -> ((LastConfirmedSeq) msg).getSeq() == 11));
         }
     }
 }

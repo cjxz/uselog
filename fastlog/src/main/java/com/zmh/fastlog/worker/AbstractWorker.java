@@ -10,13 +10,6 @@ public abstract class AbstractWorker<MESSAGE, EVENT> implements SequenceReportin
         dequeue(event, sequence, endOfBatch);
     }
 
-    @Override
-    public boolean sendMessage(MESSAGE message) {
-        return enqueue(message);
-    }
-
-    protected abstract boolean enqueue(MESSAGE message);
-
     protected abstract void dequeue(EVENT event, long sequence, boolean endOfBatch);
 
     protected Sequence sequenceCallback;

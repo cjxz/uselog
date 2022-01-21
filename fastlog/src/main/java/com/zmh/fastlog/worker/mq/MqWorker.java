@@ -3,13 +3,13 @@ package com.zmh.fastlog.worker.mq;
 import com.lmax.disruptor.*;
 import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
-import com.zmh.fastlog.model.event.ByteDataSoftRef;
+import com.zmh.fastlog.model.event.EventSlot;
 import com.zmh.fastlog.model.message.ByteData;
 import com.zmh.fastlog.model.message.LastConfirmedSeq;
 import com.zmh.fastlog.utils.ThreadUtils;
 import com.zmh.fastlog.worker.AbstractWorker;
-import com.zmh.fastlog.worker.Worker;
 import com.zmh.fastlog.worker.log.LogMissingCountAndPrint;
+import com.zmh.fastlog.worker.log.LogWorker;
 import com.zmh.fastlog.worker.mq.producer.MqProducer;
 import lombok.SneakyThrows;
 
@@ -18,13 +18,13 @@ import static com.zmh.fastlog.utils.Utils.debugLog;
 import static java.lang.System.currentTimeMillis;
 import static java.util.concurrent.TimeUnit.SECONDS;
 
-public class MqWorker extends AbstractWorker<ByteData, ByteDataSoftRef>
+public class MqWorker extends AbstractWorker<ByteData, EventSlot>
     implements BatchStartAware, TimeoutHandler {
 
-    private final Worker<Object> logWorker;
+    private LogWorker logWorker;
 
-    private final Disruptor<ByteDataSoftRef> queue;
-    private RingBuffer<ByteDataSoftRef> ringBuffer;
+    private final Disruptor<EventSlot> queue;
+    private RingBuffer<EventSlot> ringBuffer;
 
     private volatile MqProducer mqProducer;
 
@@ -32,13 +32,12 @@ public class MqWorker extends AbstractWorker<ByteData, ByteDataSoftRef>
 
     private final int batchSize;
 
-    public MqWorker(Worker<Object> logWorker, MqProducer mqProducer, int batchSize) {
-        this.logWorker = logWorker;
+    public MqWorker(MqProducer mqProducer, int batchSize) {
         this.mqProducer = mqProducer;
         this.batchSize = batchSize;
 
         queue = new Disruptor<>(
-            ByteDataSoftRef::new,
+            EventSlot::new,
             batchSize << 2,
             namedDaemonThreadFactory("log-mq-worker"),
             ProducerType.SINGLE,
@@ -51,6 +50,10 @@ public class MqWorker extends AbstractWorker<ByteData, ByteDataSoftRef>
         queue.start();
     }
 
+    public void registerLogWorker(LogWorker logWorker) {
+        this.logWorker = logWorker;
+    }
+
     /**
      * mq ring buffer 生产者
      *
@@ -60,7 +63,7 @@ public class MqWorker extends AbstractWorker<ByteData, ByteDataSoftRef>
      * @return true 日志发送成功 false 日志发送失败
      */
     @Override
-    protected boolean enqueue(ByteData byteData) {
+    public boolean enqueue(ByteData byteData) {
         return !isDisposed && mqProducer.isReady() && ringBuffer.tryPublishEvent((e, s) -> byteData.switchData(e.getByteData()));
     }
 
@@ -70,7 +73,7 @@ public class MqWorker extends AbstractWorker<ByteData, ByteDataSoftRef>
     private LogMissingCountAndPrint logMissingCount = new LogMissingCountAndPrint("mq");
 
     @Override
-    protected void dequeue(ByteDataSoftRef event, long sequence, boolean endOfBatch) {
+    public void dequeue(EventSlot event, long sequence, boolean endOfBatch) {
         // 消费的时候，有可能mqProducer还没准备好，此时需要尽可能的等待mqProducer准备好为止
         while (!mqProducer.isReady()) {
             ThreadUtils.sleep(100);
@@ -122,7 +125,7 @@ public class MqWorker extends AbstractWorker<ByteData, ByteDataSoftRef>
      */
     private void sendSeqMsg() {
         if (lastSendSeqId != lastMessageId || (nextSendSeqTime < currentTimeMillis())) {
-            logWorker.sendMessage(new LastConfirmedSeq(lastMessageId));
+            logWorker.enqueue(new LastConfirmedSeq(lastMessageId));
             nextSendSeqTime = currentTimeMillis() + 1000;
             lastSendSeqId = lastMessageId;
         }

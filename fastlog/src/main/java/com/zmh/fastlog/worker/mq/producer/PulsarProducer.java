@@ -1,6 +1,6 @@
 package com.zmh.fastlog.worker.mq.producer;
 
-import com.zmh.fastlog.model.event.ByteDataSoftRef;
+import com.zmh.fastlog.model.event.EventSlot;
 import com.zmh.fastlog.model.message.ByteData;
 import lombok.SneakyThrows;
 import org.apache.pulsar.client.api.Producer;
@@ -88,7 +88,7 @@ public class PulsarProducer implements MqProducer {
     }
 
     @Override
-    public void sendEvent(ByteDataSoftRef event) {
+    public void sendEvent(EventSlot event) {
         TypedMessageBuilderImpl<byte[]> pulsarMessage = (TypedMessageBuilderImpl<byte[]>) producer.newMessage();
 
         ByteData buffer = event.getByteData();

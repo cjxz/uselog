@@ -6,12 +6,13 @@ import com.lmax.disruptor.LiteBlockingWaitStrategy;
 import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
-import com.zmh.fastlog.model.event.ByteDataSoftRef;
+import com.zmh.fastlog.model.event.EventSlot;
 import com.zmh.fastlog.model.message.ByteData;
 import com.zmh.fastlog.model.message.LastConfirmedSeq;
 import com.zmh.fastlog.utils.ThreadUtils;
 import com.zmh.fastlog.worker.AbstractWorker;
-import com.zmh.fastlog.worker.Worker;
+import com.zmh.fastlog.worker.file.FileWorker;
+import com.zmh.fastlog.worker.mq.MqWorker;
 import lombok.Getter;
 import lombok.val;
 
@@ -24,7 +25,7 @@ import static org.apache.commons.lang3.StringUtils.startsWithAny;
 /**
  * @author zmh
  */
-public class LogWorker extends AbstractWorker<Object, ByteDataSoftRef>
+public class LogWorker extends AbstractWorker<Object, EventSlot>
     implements BatchStartAware {
 
     // 日志有两个可能方向, 一个往mq, 一个写本地文件缓存
@@ -38,8 +39,8 @@ public class LogWorker extends AbstractWorker<Object, ByteDataSoftRef>
     private final int highWaterLevelFile;
 
     // 日志缓冲区
-    private final Disruptor<ByteDataSoftRef> queue;
-    private final RingBuffer<ByteDataSoftRef> ringBuffer;
+    private final Disruptor<EventSlot> queue;
+    private final RingBuffer<EventSlot> ringBuffer;
 
     // 统计丢弃的日志数
     final LogMissingCountAndPrint logMissingCount = new LogMissingCountAndPrint("log");
@@ -49,15 +50,15 @@ public class LogWorker extends AbstractWorker<Object, ByteDataSoftRef>
     // 初始时先通过file,file缓冲区为空的切到mq
     // mq堵塞的时候切到file缓存
     private boolean directWriteToMq = false;
-    private final Worker<ByteData> mqWorker;
-    private final Worker<ByteData> fileWorker;
+    private final MqWorker mqWorker;
+    private final FileWorker fileWorker;
 
     // 日志序列化类
     private MessageConverter messageConverter;
 
     private volatile boolean isClosed = false;
 
-    public LogWorker(Worker<ByteData> mqWorker, Worker<ByteData> fileWorker, int batchSize, int maxMsgSize) {
+    public LogWorker(MqWorker mqWorker, FileWorker fileWorker, int batchSize, int maxMsgSize) {
         this.messageConverter = new MessageConverter(maxMsgSize);
         this.mqWorker = mqWorker;
         this.fileWorker = fileWorker;
@@ -69,7 +70,7 @@ public class LogWorker extends AbstractWorker<Object, ByteDataSoftRef>
         this.highWaterLevelMq = bufferSize >> 1;
 
         queue = new Disruptor<>(
-            ByteDataSoftRef::new,
+            EventSlot::new,
             bufferSize,
             namedDaemonThreadFactory("log-log-worker"),
             ProducerType.MULTI, // 注意此处为多生产者
@@ -78,6 +79,8 @@ public class LogWorker extends AbstractWorker<Object, ByteDataSoftRef>
         queue.handleEventsWith(this);
         ringBuffer = queue.getRingBuffer();
         queue.start();
+
+        mqWorker.registerLogWorker(this);
     }
 
     /**
@@ -88,7 +91,7 @@ public class LogWorker extends AbstractWorker<Object, ByteDataSoftRef>
      */
     @SuppressWarnings("CodeBlock2Expr")
     @Override
-    protected boolean enqueue(Object message) {
+    public boolean enqueue(Object message) {
         if (message instanceof ILoggingEvent) {
             val msg = (ILoggingEvent) message;
             if (isExclude(msg)) {
@@ -119,7 +122,7 @@ public class LogWorker extends AbstractWorker<Object, ByteDataSoftRef>
 
     // ringbuffer的消费者逻辑，这里已经是单线程了，lastMessageId没有并发问题
     @Override
-    protected void dequeue(ByteDataSoftRef event, long sequence, boolean endOfBatch) {
+    public void dequeue(EventSlot event, long sequence, boolean endOfBatch) {
         long messageId = lastMessageId + 1;
 
         ByteData byteData = event.getByteData();
@@ -127,7 +130,7 @@ public class LogWorker extends AbstractWorker<Object, ByteDataSoftRef>
 
         boolean success = false;
         if (directWriteToMq) {
-            while (!(success = mqWorker.sendMessage(byteData))) {
+            while (!(success = mqWorker.enqueue(byteData))) {
                 if (isClosed) {
                     break;
                 }
@@ -144,7 +147,7 @@ public class LogWorker extends AbstractWorker<Object, ByteDataSoftRef>
         }
 
         if (!directWriteToMq) {
-            while (!(success = fileWorker.sendMessage(byteData))) {
+            while (!(success = fileWorker.enqueue(byteData))) {
                 if (isClosed) {
                     break;
                 }

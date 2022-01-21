@@ -7,7 +7,7 @@ package com.zmh.fastlog.worker;
  */
 public interface Worker<MESSAGE> extends AutoCloseable {
 
-    boolean sendMessage(MESSAGE message);
+    boolean enqueue(MESSAGE message);
 
     void close();
 }
