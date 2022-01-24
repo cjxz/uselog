@@ -29,7 +29,7 @@ import static java.util.Optional.of;
 import static java.util.Optional.ofNullable;
 import static java.util.stream.Collectors.toCollection;
 
-public class FIFOQueue implements AutoCloseable {
+public class FIFOQueue implements AutoCloseable, FIFO {
 
     /**
      * 队列尾巴 是 写缓冲区
@@ -72,7 +72,7 @@ public class FIFOQueue implements AutoCloseable {
             return;
         }
 
-        if (head.isEmpty() && fileSize() == 0) {
+        if (head.isEmpty() && getFileNum() == 0) {
             tail.copyTo(head);
             tail.reset();
         } else {
@@ -97,7 +97,7 @@ public class FIFOQueue implements AutoCloseable {
             return;
         }
 
-        if (fileSize() > 0) {
+        if (getFileNum() > 0) {
             logFiles.pollTo(head.getBytes());
             current = head.get();
             return;
@@ -107,7 +107,7 @@ public class FIFOQueue implements AutoCloseable {
     }
 
     // for test
-    int fileSize() {
+    public int getFileNum() {
         return logFiles.getFileSize();
     }
 

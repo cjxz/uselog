@@ -1,6 +1,7 @@
 package com.zmh.fastlog.worker.file.fifo;
 
 import com.zmh.fastlog.model.message.ByteData;
+import com.zmh.fastlog.worker.file.FIFO;
 import lombok.NonNull;
 import lombok.SneakyThrows;
 
@@ -15,7 +16,7 @@ import static com.zmh.fastlog.worker.file.fifo.ReadWriteFileFactory.createWriteF
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 
-public class FIFOFile implements Closeable {
+public class FIFOFile implements Closeable, FIFO {
     private FilesManager filesManager;
 
     private ReadWriteFile writeFile;

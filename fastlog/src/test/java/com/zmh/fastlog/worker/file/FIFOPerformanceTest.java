@@ -13,30 +13,43 @@ import java.util.concurrent.TimeUnit;
 public class FIFOPerformanceTest extends BeforeDeleteFile {
 
     @Test
-    public void test() {
-        //try (FIFOFile fifo = new FIFOFile("logs/cache", 64 * 1024 * 1024, 100)) { //直接写磁盘
-        try (FIFOQueue fifo = new FIFOQueue("logs/cache", 64 * 1024 * 1024, 100)) { //先写内存，再批量写磁盘
-            StopWatch watch = new StopWatch();
-            long seq = 1L;
-
-            byte[] bytes = getText(200).getBytes();
-            ByteData byteEvent = new ByteData(0, bytes, bytes.length);
-
-            watch.start();
-            for (int i = 0; i < 1000; i++) {
-                for (int j = 0; j < 10000; j++) {
-                    byteEvent.setId(seq++);
-                    fifo.put(byteEvent);
-                }
-
-                for (int j = 0; j < 1000; j++) {
-                    fifo.get();
-                }
-            }
-            watch.stop();
-            System.out.println(watch.formatTime());
-            System.out.println(1000 / watch.getTime(TimeUnit.SECONDS));
+    public void testFIFOQueue() {
+        //先写内存，再批量写磁盘，每个文件64MB
+        try (FIFOQueue fifo = new FIFOQueue("logs/cache", 64 * 1024 * 1024, 1600)) {
+            execute(fifo);
         }
+    }
+
+    @Test
+    public void testFIFOFile() {
+        //直接写磁盘 每个文件1GB
+        try (FIFOFile fifo = new FIFOFile("logs/cache", 1024 * 1024 * 1024, 100)) {
+            execute(fifo);
+        }
+    }
+
+    private void execute(FIFO fifo) {
+        StopWatch watch = new StopWatch();
+        long seq = 1L;
+
+        byte[] bytes = getText(200).getBytes();
+        ByteData byteEvent = new ByteData(0, bytes, bytes.length);
+
+        watch.start();
+        for (int i = 0; i < 1000; i++) {
+            for (int j = 0; j < 10000; j++) {
+                byteEvent.setId(seq++);
+                fifo.put(byteEvent);
+            }
+
+            for (int j = 0; j < 1000; j++) {
+                fifo.get();
+            }
+        }
+        watch.stop();
+        System.out.println(fifo.getFileNum());
+        System.out.println(watch.formatTime());
+        System.out.println(1000 / watch.getTime(TimeUnit.SECONDS));
     }
 
     private String getText(int size) {
