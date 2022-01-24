@@ -36,7 +36,8 @@ public class FIFOPerformanceTest extends BeforeDeleteFile {
         ByteData byteEvent = new ByteData(0, bytes, bytes.length);
 
         watch.start();
-        for (int i = 0; i < 1000; i++) {
+        int total = 10000;
+        for (int i = 0; i < total; i++) {
             for (int j = 0; j < 10000; j++) {
                 byteEvent.setId(seq++);
                 fifo.put(byteEvent);
@@ -44,12 +45,13 @@ public class FIFOPerformanceTest extends BeforeDeleteFile {
 
             for (int j = 0; j < 1000; j++) {
                 fifo.get();
+                fifo.next();
             }
         }
         watch.stop();
-        System.out.println(fifo.getFileNum());
+        System.out.println("一共创建了" + fifo.getTotalFile() + "个文件，还剩余" + fifo.getFileNum() + "个文件");
         System.out.println(watch.formatTime());
-        System.out.println(1000 / watch.getTime(TimeUnit.SECONDS));
+        System.out.println(total / watch.getTime(TimeUnit.SECONDS) + "w/QPS");
     }
 
     private String getText(int size) {

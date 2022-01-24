@@ -7,5 +7,9 @@ public interface FIFO {
 
     ByteData get();
 
+    void next();
+
     int getFileNum();
+
+    int getTotalFile();
 }

@@ -111,6 +111,11 @@ public class FIFOQueue implements AutoCloseable, FIFO {
         return logFiles.getFileSize();
     }
 
+    @Override
+    public int getTotalFile() {
+        return logFiles.getTotalFile();
+    }
+
     public void flush() {
         if (tail.isEmpty()) {
             return;
@@ -334,6 +339,10 @@ class LogFiles implements AutoCloseable {
         return files.getFileSize();
     }
 
+    public int getTotalFile() {
+        return files.getIndex().get() - 1;
+    }
+
     @Override
     public void close() {
         files.close();
@@ -344,6 +353,7 @@ class LogFiles implements AutoCloseable {
 
 class FilesManager implements AutoCloseable {
 
+    @Getter
     private final AtomicInteger index;
 
     private final Queue<Path> queue;

@@ -133,6 +133,11 @@ public class FIFOFile implements Closeable, FIFO {
         return filesManager.getFileNum();
     }
 
+    @Override
+    public int getTotalFile() {
+        return filesManager.getIndex(filesManager.last());
+    }
+
     // for test
     @SneakyThrows
     long getFileSize() {
