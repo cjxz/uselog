@@ -1,4 +1,4 @@
-package com.zmh.fastlog.worker.file;
+package com.zmh.fastlog.worker.file.fifo;
 
 import com.zmh.fastlog.model.message.ByteData;
 import com.zmh.fastlog.worker.BeforeDeleteFile;
@@ -12,6 +12,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Arrays;
 
+import static com.zmh.fastlog.worker.file.fifo.ReadWriteFileFactory.createWriteFile;
 import static org.junit.Assert.*;
 
 public class ReadWriteFileTest extends BeforeDeleteFile {
@@ -23,7 +24,7 @@ public class ReadWriteFileTest extends BeforeDeleteFile {
         Files.createFile(logFile);
 
         IndexFile indexFile = new IndexFile(Paths.get("logs/cache"));
-        try (ReadWriteFile rwf = new ReadWriteFile(logFile, indexFile, 1 << 20, 1)) {
+        try (ReadWriteFile rwf = createWriteFile(logFile, indexFile, 1 << 20)) {
             byte[] bytes = new byte[128];
             Arrays.fill(bytes, (byte) 40);
 
@@ -48,7 +49,7 @@ public class ReadWriteFileTest extends BeforeDeleteFile {
         Files.createFile(logFile);
 
         IndexFile indexFile = new IndexFile(Paths.get("logs/cache"));
-        try (ReadWriteFile rwf = new ReadWriteFile(logFile, indexFile, 1 << 20, 1)) {
+        try (ReadWriteFile rwf = createWriteFile(logFile, indexFile, 1 << 20)) {
             byte[] bytes = new byte[128];
             Arrays.fill(bytes, (byte) 40);
 
@@ -80,7 +81,7 @@ public class ReadWriteFileTest extends BeforeDeleteFile {
         Files.createFile(logFile);
 
         IndexFile indexFile = new IndexFile(Paths.get("logs/cache"));
-        try (ReadWriteFile rwf = new ReadWriteFile(logFile, indexFile, 1024, 1)) {
+        try (ReadWriteFile rwf = createWriteFile(logFile, indexFile, 1024)) {
             byte[] bytes = new byte[128];
             Arrays.fill(bytes, (byte) 40);
 
@@ -113,7 +114,7 @@ public class ReadWriteFileTest extends BeforeDeleteFile {
         Files.createFile(logFile);
 
         IndexFile indexFile = new IndexFile(Paths.get("logs/cache"));
-        try (ReadWriteFile rwf = new ReadWriteFile(logFile, indexFile, 1024, 1)) {
+        try (ReadWriteFile rwf = createWriteFile(logFile, indexFile, 1024)) {
             byte[] bytes = new byte[128];
             Arrays.fill(bytes, (byte) 40);
 

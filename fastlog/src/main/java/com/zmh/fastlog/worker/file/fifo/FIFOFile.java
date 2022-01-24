@@ -2,15 +2,19 @@ package com.zmh.fastlog.worker.file.fifo;
 
 import com.zmh.fastlog.model.message.ByteData;
 import lombok.NonNull;
+import lombok.SneakyThrows;
 
+import java.io.Closeable;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 
+import static com.zmh.fastlog.utils.Utils.safeClose;
 import static com.zmh.fastlog.worker.file.fifo.ReadWriteFileFactory.createReadFile;
 import static com.zmh.fastlog.worker.file.fifo.ReadWriteFileFactory.createWriteFile;
 import static java.util.Objects.isNull;
-import static java.util.Objects.nonNull;
 
-public class FIFOFile {
+public class FIFOFile implements Closeable {
     private FilesManager filesManager;
 
     private ReadWriteFile writeFile;
@@ -23,20 +27,29 @@ public class FIFOFile {
 
     private int maxFileSize;
 
-    public FIFOFile(@NonNull String queueName, @NonNull Path folder, long capacity, int maxFileSize) {
+    @SneakyThrows
+    public FIFOFile(@NonNull String folder, long capacity, int maxFileSize) {
+        Path path = Paths.get(folder);
+
+        if (!Files.exists(path)) {
+            Files.createDirectories(path);
+        }
+
         this.filesManager = FilesManager.builder()
-            .folder(folder)
-            .prefix(queueName + '-')
+            .folder(path)
+            .prefix("queue-")
             .suffix(".log")
             .build();
 
-        this.indexFile = new IndexFile(folder);
+        this.indexFile = new IndexFile(path);
         this.capacity = capacity;
         this.maxFileSize = maxFileSize;
+
+        initWriteReadFile();
     }
 
     private void initWriteReadFile() {
-        int fileSize = filesManager.getFileSize();
+        int fileSize = filesManager.getFileNum();
         if (fileSize > 0) {
             long readIndex = indexFile.readIndex(0);
             long writeIndex = indexFile.writeIndex(0);
@@ -59,41 +72,72 @@ public class FIFOFile {
                     readFile = createReadFile(path, indexFile, readIndex, writeIndex, capacity);
                 }
             }
+        } else {
+            Path path = filesManager.createNextFile();
+            writeFile = createWriteFile(path, indexFile, capacity);
         }
 
     }
 
-    public void write(ByteData byteData) {
-        if (isNull(writeFile) || !writeFile.write(byteData)) {
+    public void put(ByteData byteData) {
+        if (!writeFile.write(byteData)) {
+            System.out.println(getFileNum() + ":" + getFileSize());
             Path path = filesManager.createNextFile();
-            if (filesManager.getFileSize() > maxFileSize) {
+            if (filesManager.getFileNum() > maxFileSize) {
                 filesManager.remove(readFile.getPath());
                 readFile = null;
             }
 
-            if (isNull(readFile) && nonNull(writeFile) && filesManager.getFileSize() == 1) {
-                readFile = createReadFile(path, indexFile, writeFile.getReadIndex(), writeFile.getWriteIndex(), capacity);
+            if (filesManager.getFileNum() == 1) {
+                readFile = createReadFile(writeFile.getPath(), indexFile, writeFile.getReadIndex(), writeFile.getWriteIndex(), capacity);
             }
             writeFile = createWriteFile(path, indexFile, capacity);
+            writeFile.write(byteData);
         }
-
-        writeFile.write(byteData);
     }
 
-    public ByteData read() {
+    private ByteData current;
+
+    public ByteData get() {
+        if (isNull(current)) {
+            next();
+        }
+
+        return current;
+    }
+
+    public void next() {
         if (isNull(readFile)) {
-            if (filesManager.getFileSize() == 1) {
-                return writeFile.read();
+            if (filesManager.getFileNum() == 1) {
+                current = writeFile.read();
+                return;
             } else {
                 Path path = filesManager.first();
                 readFile = createReadFile(path, indexFile, capacity);
             }
         }
-        ByteData data = readFile.read();
-        if (isNull(data)) {
+        current = readFile.read();
+        if (isNull(current)) {
             filesManager.remove(readFile.getPath());
             readFile = null;
         }
-        return data;
+    }
+
+    public int getFileNum() {
+        return filesManager.getFileNum();
+    }
+
+    // for test
+    @SneakyThrows
+    long getFileSize() {
+        return writeFile.getChannel().size();
+    }
+
+    @Override
+    public void close() {
+        safeClose(filesManager);
+        safeClose(indexFile);
+        safeClose(writeFile);
+        safeClose(readFile);
     }
 }

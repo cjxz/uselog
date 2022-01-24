@@ -54,6 +54,12 @@ public class IndexFile implements Closeable {
         mbb.putLong(position + 8, 0);
     }
 
+    public void reset(int fileIndex, long readIndex, long writeIndex) {
+        int position = position(fileIndex);
+        mbb.putLong(position, readIndex);
+        mbb.putLong(position + 8, writeIndex);
+    }
+
     private int position(int fileIndex) {
         return (fileIndex & 1) << 4;
     }

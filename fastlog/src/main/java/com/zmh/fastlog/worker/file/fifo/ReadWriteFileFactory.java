@@ -17,6 +17,7 @@ public class ReadWriteFileFactory {
     }
 
     public static ReadWriteFile createReadFile(Path path, IndexFile indexFile, long readIndex, long writeIndex, long capacity) {
+        indexFile.reset(1, readIndex, writeIndex);
         return new ReadWriteFile(path, indexFile, readIndex, writeIndex, capacity, 1);
     }
 }

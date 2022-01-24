@@ -66,7 +66,7 @@ public class FilesManager implements AutoCloseable {
         queue.clear();
     }
 
-    public int getFileSize() {
+    public int getFileNum() {
         return queue.size();
     }
 

@@ -1,4 +1,4 @@
-package com.zmh.fastlog.worker.file;
+package com.zmh.fastlog.worker.file.fifo;
 
 import com.zmh.fastlog.worker.BeforeDeleteFile;
 import com.zmh.fastlog.worker.file.fifo.IndexFile;

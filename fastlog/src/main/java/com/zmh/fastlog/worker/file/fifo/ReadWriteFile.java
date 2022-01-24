@@ -13,22 +13,17 @@ import static com.zmh.fastlog.utils.Utils.*;
 import static java.nio.file.StandardOpenOption.READ;
 import static java.nio.file.StandardOpenOption.WRITE;
 
+@Getter
 public class ReadWriteFile implements Closeable {
-    @Getter
     private Path path;
     private IndexFile indexFile;
     private FileChannel channel;
-    @Getter
     private long readIndex;
-    @Getter
     private long writeIndex;
     private long capacity;
     private int fileIndex;
 
-    public ReadWriteFile(Path path, IndexFile indexFile, long capacity, int fileIndex) {
-        this(path, indexFile, indexFile.readIndex(fileIndex), indexFile.writeIndex(fileIndex), capacity, fileIndex);
-    }
-
+    @SuppressWarnings("WeakerAccess")
     @SneakyThrows
     public ReadWriteFile(Path path, IndexFile indexFile, long readIndex, long writeIndex, long capacity, int fileIndex) {
         this.path = path;
