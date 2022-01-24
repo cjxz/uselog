@@ -50,7 +50,7 @@ public class FIFOQueue implements AutoCloseable {
     private final BytesCacheQueue head;
 
     @SneakyThrows
-    FIFOQueue(int cacheSize, int maxFileCount, String folder) {
+    FIFOQueue(String folder, int cacheSize, int maxFileCount) {
         Path path = Paths.get(folder);
 
         if (!Files.exists(path)) {

@@ -28,7 +28,7 @@ public class FileWorker extends AbstractWorker<ByteData, EventSlot>
     private volatile boolean isClose;
 
     public FileWorker(MqWorker mqWorker, int cacheSize, int maxFileCount, String folder) {
-        fifo = new FIFOQueue(cacheSize, maxFileCount, folder);
+        fifo = new FIFOQueue(folder, cacheSize, maxFileCount);
 
         this.mqWorker = mqWorker;
         queue = new Disruptor<>(

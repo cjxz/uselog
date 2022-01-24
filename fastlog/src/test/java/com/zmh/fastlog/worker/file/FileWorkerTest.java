@@ -2,76 +2,19 @@ package com.zmh.fastlog.worker.file;
 
 import com.zmh.fastlog.model.message.ByteData;
 import com.zmh.fastlog.utils.ThreadUtils;
-import lombok.SneakyThrows;
 import org.apache.commons.lang3.RandomUtils;
-import org.apache.commons.lang3.time.StopWatch;
-import org.junit.Ignore;
 import org.junit.Test;
 
 import java.util.Arrays;
-import java.util.Random;
-import java.util.concurrent.TimeUnit;
 
 import static java.util.Objects.nonNull;
 import static org.junit.Assert.*;
 
 public class FileWorkerTest {
 
-    @Ignore
-    @Test
-    public void test() {
-        try (FIFOQueue fifo = new FIFOQueue(64 * 1024 * 1024, 100, "logs/cache")) {
-            StopWatch watch = new StopWatch();
-            long seq = 1L;
-
-            byte[] bytes = getText(200).getBytes();
-
-            watch.start();
-            for (int i = 0; i < 10000; i++) {
-                for (int j = 0; j < 1000; j++) {
-                    ByteData byteEvent = new ByteData(seq++, bytes, bytes.length);
-                    fifo.put(byteEvent);
-                }
-
-                for (int j = 0; j < 10; j++) {
-                    fifo.get();
-                }
-            }
-            watch.stop();
-            System.out.println(watch.formatTime());
-            System.out.println(1000 / watch.getTime(TimeUnit.SECONDS));
-        }
-    }
-
-    private String getText(int size) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < size; i++) {
-            sb.append(getRandomChar());
-        }
-        sb.append("。");
-        return sb.toString();
-    }
-
-    //随机生成常见汉字
-    @SneakyThrows
-    private String getRandomChar() {
-        int highCode;
-        int lowCode;
-
-        Random random = new Random();
-
-        highCode = (176 + Math.abs(random.nextInt(39))); //B0 + 0~39(16~55) 一级汉字所占区
-        lowCode = (161 + Math.abs(random.nextInt(93))); //A1 + 0~93 每区有94个汉字
-
-        byte[] b = new byte[2];
-        b[0] = (Integer.valueOf(highCode)).byteValue();
-        b[1] = (Integer.valueOf(lowCode)).byteValue();
-        return new String(b, "GBK");
-    }
-
     @Test
     public void testFIFOFileQueuePutAndGet() {
-        try (FIFOQueue fifoFile = new FIFOQueue(1024, 100, "logs/cache")) {
+        try (FIFOQueue fifoFile = new FIFOQueue("logs/cache",1024, 100)) {
             long seq = 1L;
 
             for (int i = 0; i < 7; i++) {
@@ -85,7 +28,7 @@ public class FileWorkerTest {
 
     @Test
     public void testFIFOFileQueuePutAndGetNum() {
-        try (FIFOQueue fifoFile = new FIFOQueue(32 * 1024 * 1024, 100, "logs/cache")) {
+        try (FIFOQueue fifoFile = new FIFOQueue("logs/cache", 32 * 1024 * 1024, 100)) {
             long seq = 1L;
 
             String text = "中文English123中文English123中文English123中文English123中文English123中文English123中文English123中文English123中文English123中文English123中文English123中文English123";
