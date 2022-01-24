@@ -46,14 +46,16 @@ public class ReadWriteFile implements Closeable {
 
     public boolean write(ByteData byteData) {
         int len = byteData.getDataLength();
-        if (writeIndex - readIndex + len + 12 > capacity) {
-            return false;
-        }
+        boolean isFull = writeIndex - readIndex + len + 12 > capacity;
 
         long position = writeIndex & (capacity - 1);
         if (position + len + 16 >= capacity) {
             resetWritePosition();
-            return write(byteData);
+            return !isFull && write(byteData);
+        }
+
+        if (isFull) {
+            return false;
         }
 
         lenBuffer.clear();
@@ -116,6 +118,7 @@ public class ReadWriteFile implements Closeable {
         }
 
         buffer.clear();
+        buffer.limit(len);
 
         long position = readIndex & (capacity - 1);
         this.channel.read(buffer, position);
@@ -144,7 +147,7 @@ public class ReadWriteFile implements Closeable {
         channel.write(endBuffer, position);
 
         writeIndex += len;
-        indexFile.write(this.fileIndex, len);
+        indexFile.write(fileIndex, len);
     }
 
     @Override

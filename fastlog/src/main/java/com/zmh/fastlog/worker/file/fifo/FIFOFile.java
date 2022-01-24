@@ -13,6 +13,7 @@ import static com.zmh.fastlog.utils.Utils.safeClose;
 import static com.zmh.fastlog.worker.file.fifo.ReadWriteFileFactory.createReadFile;
 import static com.zmh.fastlog.worker.file.fifo.ReadWriteFileFactory.createWriteFile;
 import static java.util.Objects.isNull;
+import static java.util.Objects.nonNull;
 
 public class FIFOFile implements Closeable {
     private FilesManager filesManager;
@@ -80,20 +81,24 @@ public class FIFOFile implements Closeable {
     }
 
     public void put(ByteData byteData) {
-        if (!writeFile.write(byteData)) {
-            System.out.println(getFileNum() + ":" + getFileSize());
-            Path path = filesManager.createNextFile();
-            if (filesManager.getFileNum() > maxFileSize) {
-                filesManager.remove(readFile.getPath());
+        if (writeFile.write(byteData)) {
+            return;
+        }
+
+        if (filesManager.getFileNum() == 1) {
+            readFile = createReadFile(writeFile.getPath(), indexFile, writeFile.getReadIndex(), writeFile.getWriteIndex(), capacity);
+        }
+
+        Path path = filesManager.createNextFile();
+        if (filesManager.getFileNum() > maxFileSize) {
+            filesManager.remove(filesManager.first());
+            if (nonNull(readFile)) {
                 readFile = null;
             }
-
-            if (filesManager.getFileNum() == 1) {
-                readFile = createReadFile(writeFile.getPath(), indexFile, writeFile.getReadIndex(), writeFile.getWriteIndex(), capacity);
-            }
-            writeFile = createWriteFile(path, indexFile, capacity);
-            writeFile.write(byteData);
         }
+
+        writeFile = createWriteFile(path, indexFile, capacity);
+        writeFile.write(byteData);
     }
 
     private ByteData current;

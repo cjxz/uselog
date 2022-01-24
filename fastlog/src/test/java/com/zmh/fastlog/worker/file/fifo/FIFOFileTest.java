@@ -59,22 +59,19 @@ public class FIFOFileTest extends BeforeDeleteFile {
         try (FIFOFile fifoFile = new FIFOFile("logs/cache", 32 * 1024 * 1024, 100)) {
             long seq = 0L;
 
-            String text = "中文English123中文English123中文English123中文English123中文English123中文English123中文English123中文English123中文English123中文English123中文English123中文English123";
-
-            byte[] bytes = Arrays.copyOf(text.getBytes(), 200);
-            ByteData byteData = new ByteData(0, bytes, 192);
+            String text = "\tcreatePropertyTransferOrder model:{\"buyerName\":\"途虎养车工场店（开封黄河路店）\",\"buyerType\":\"SHOP\",\"items\":[{\"num\":1,\"price\":25.0}],\"sellerId\":\"1001\",\"sellerName\":\"上海阑途信息技术有限公司\",\"sellerType\":\"TUHU_CORP\"}";
+            ByteData byteData = new ByteData(0, Arrays.copyOf(text.getBytes(), 300), 192);
 
             ByteData message;
-
             int read = 0;
             for (int i = 0; i < 100; i++) {
                 for (int j = 0; j < 10240; j++) {
                     byteData.setId(seq++);
+                    byteData.setDataLength((j % 50) * 4 + 1);
                     fifoFile.put(byteData);
                 }
 
                 int num = RandomUtils.nextInt(100, 10240), count = 0;
-                System.out.println(i + ":" + num);
                 while (count++ < num && nonNull(message = fifoFile.get())) {
                     read++;
                     fifoFile.next();
@@ -88,7 +85,7 @@ public class FIFOFileTest extends BeforeDeleteFile {
                 size++;
                 fifoFile.next();
             }
-            assertEquals(100 * 1_0000 - read, size);
+            assertEquals(100 * 10240 - read, size);
         }
     }
 
