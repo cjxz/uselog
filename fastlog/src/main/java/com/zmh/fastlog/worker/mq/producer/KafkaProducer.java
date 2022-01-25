@@ -103,7 +103,7 @@ public class KafkaProducer implements MqProducer {
         if (isReady) {
             return;
         }
-
+        // todo zmh serial
         ProducerRecord<String, ByteBuffer> record = new ProducerRecord<>(topic, ByteBuffer.wrap("heartbeat".getBytes()));
         Future<RecordMetadata> future = producer.send(record);
         try {

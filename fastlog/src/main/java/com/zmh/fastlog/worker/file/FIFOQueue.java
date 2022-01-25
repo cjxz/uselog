@@ -1,33 +1,32 @@
 package com.zmh.fastlog.worker.file;
 
 import com.zmh.fastlog.model.message.ByteData;
+import com.zmh.fastlog.worker.file.fifo.FilesManager;
 import io.appulse.utils.Bytes;
 import io.appulse.utils.ReadBytesUtils;
 import io.appulse.utils.WriteBytesUtils;
 import lombok.*;
 import org.apache.commons.lang3.time.StopWatch;
 
+import java.io.Closeable;
+import java.io.RandomAccessFile;
+import java.nio.ByteBuffer;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.LinkedList;
-import java.util.Queue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
-import static com.zmh.fastlog.utils.Utils.debugLog;
-import static com.zmh.fastlog.utils.Utils.marginToBuffer;
-import static java.util.Comparator.comparing;
-import static java.util.Locale.ENGLISH;
+import static com.zmh.fastlog.utils.Utils.*;
+import static com.zmh.fastlog.worker.file.LogFileFactory.createReadFile;
+import static com.zmh.fastlog.worker.file.LogFileFactory.createWriteFile;
+import static java.nio.file.StandardOpenOption.READ;
+import static java.nio.file.StandardOpenOption.WRITE;
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
-import static java.util.Optional.of;
-import static java.util.Optional.ofNullable;
-import static java.util.stream.Collectors.toCollection;
 
 public class FIFOQueue implements AutoCloseable, FIFO {
 
@@ -38,7 +37,7 @@ public class FIFOQueue implements AutoCloseable, FIFO {
      */
     private final TwoBytesCacheQueue tail;
 
-    private final LogFiles logFiles;
+    private final LogFileManager logFiles;
 
     /**
      * 队列头 是 读缓冲区
@@ -51,16 +50,11 @@ public class FIFOQueue implements AutoCloseable, FIFO {
 
     @SneakyThrows
     FIFOQueue(String folder, int cacheSize, int maxFileCount) {
-        Path path = Paths.get(folder);
-
-        if (!Files.exists(path)) {
-            Files.createDirectories(path);
-        }
-
-        logFiles = LogFiles.builder()
-            .queueName("queue")
-            .folder(path)
-            .maxFileCount(maxFileCount)
+        logFiles = LogFileManager.builder()
+            .folder(folder)
+            .cacheSize(cacheSize)
+            .maxIndex(10)
+            .maxFileNum(maxFileCount)
             .build();
 
         tail = new TwoBytesCacheQueue(cacheSize);
@@ -304,7 +298,7 @@ class LogFiles implements AutoCloseable {
             debugLog("wait file：" + stopWatch.formatTime());
 
             if (getFileSize() > maxCount) {
-                Path poll = files.poll();
+                Path poll = files.first();
                 files.remove(poll);
                 debugLog("remove file：" + poll.getFileName());
             }
@@ -313,7 +307,7 @@ class LogFiles implements AutoCloseable {
 
     public void pollTo(@NonNull Bytes buffer) {
         do {
-            val file = files.peek();
+            val file = files.first();
             try {
                 if (file == null) {
                     return;
@@ -336,7 +330,7 @@ class LogFiles implements AutoCloseable {
     }
 
     public int getFileSize() {
-        return files.getFileSize();
+        return files.getFileNum();
     }
 
     public int getTotalFile() {
@@ -351,6 +345,268 @@ class LogFiles implements AutoCloseable {
 
 }
 
+class LogFileManager implements Closeable {
+    private FilesManager filesManager;
+
+    private LogFile writeFile;
+
+    private LogFile readFile;
+
+    private IndexFile indexFile;
+
+    private int maxIndex;
+
+    private int cacheSize;
+
+    private int maxFileNum;
+
+    private static final ExecutorService singleThreadExecutor = Executors.newSingleThreadExecutor();
+
+
+    @Builder
+    @SneakyThrows
+    public LogFileManager(String folder, int cacheSize, int maxIndex, int maxFileNum) {
+        Path path = Paths.get(folder);
+
+        if (!Files.exists(path)) {
+            Files.createDirectories(path);
+        }
+
+        this.filesManager = FilesManager.builder()
+            .folder(path)
+            .prefix("queue-")
+            .suffix(".log")
+            .build();
+
+        this.indexFile = new IndexFile(path);
+        this.maxIndex = maxIndex;
+        this.cacheSize = cacheSize;
+        this.maxFileNum = maxFileNum;
+
+        initWriteReadFile();
+    }
+
+    private void initWriteReadFile() {
+        int fileSize = filesManager.getFileNum();
+        if (fileSize > 0) {
+            int readIndex = indexFile.readIndex(0);
+            int writeIndex = indexFile.writeIndex(0);
+
+            Path path = filesManager.last();
+            if (readIndex >= writeIndex) {
+                writeFile = createWriteFile(path, indexFile, maxIndex, cacheSize);
+            } else {
+                writeFile = createWriteFile(path, indexFile, readIndex, writeIndex, maxIndex, cacheSize);
+            }
+
+            if (fileSize > 1) {
+                readIndex = indexFile.readIndex(1);
+                writeIndex = indexFile.writeIndex(1);
+
+                path = filesManager.first();
+                if (readIndex >= writeIndex) {
+                    filesManager.remove(path);
+                } else {
+                    readFile = createReadFile(path, indexFile, readIndex, writeIndex, maxIndex, cacheSize);
+                }
+            }
+        } else {
+            Path path = filesManager.createNextFile();
+            writeFile = createWriteFile(path, indexFile, maxIndex, cacheSize);
+        }
+    }
+
+    @SneakyThrows
+    public void pollTo(@NonNull Bytes bytes) {
+        if (isNull(readFile)) {
+            if (filesManager.getFileNum() == 1) {
+                writeFile.pollTo(bytes);
+                return;
+            } else {
+                Path path = filesManager.first();
+                readFile = createReadFile(path, indexFile, maxIndex, cacheSize);
+            }
+        }
+
+        if (!readFile.pollTo(bytes)) {
+            filesManager.remove(readFile.getPath());
+            readFile = null;
+            pollTo(bytes);
+        }
+    }
+
+    @SneakyThrows
+    public Future<?> write(@NonNull Bytes bytes) {
+        return singleThreadExecutor.submit(() -> {
+            if (writeFile.write(bytes)) {
+                return;
+            }
+
+            if (filesManager.getFileNum() >= maxFileNum) {
+                filesManager.remove(filesManager.first());
+                if (nonNull(readFile)) {
+                    readFile = null;
+                }
+            }
+
+            if (filesManager.getFileNum() == 1) {
+                readFile = createReadFile(writeFile.getPath(), indexFile, writeFile.getReadIndex(), writeFile.getWriteIndex(), maxIndex, cacheSize);
+            }
+
+            Path path = filesManager.createNextFile();
+            writeFile = createWriteFile(path, indexFile, maxIndex, cacheSize);
+            writeFile.write(bytes);
+        });
+    }
+
+    public int getFileSize() {
+        return filesManager.getFileNum();
+    }
+
+    public int getTotalFile() {
+        return filesManager.getIndex().get() - 1;
+    }
+
+    @Override
+    public void close() {
+
+    }
+}
+
+class LogFileFactory {
+    public static LogFile createWriteFile(Path folder, IndexFile indexFile, int maxIndex, int cacheSize) {
+        return createWriteFile(folder, indexFile, 0, 0, maxIndex, cacheSize);
+    }
+
+    public static LogFile createWriteFile(Path folder, IndexFile indexFile, int readIndex, int writeIndex, int maxIndex, int cacheSize) {
+        indexFile.reset(1, readIndex, writeIndex);
+        return new LogFile(folder, indexFile, maxIndex, cacheSize, 1);
+    }
+
+    public static LogFile createReadFile(Path folder, IndexFile indexFile, int maxIndex, int cacheSize) {
+        return createReadFile(folder, indexFile, 0, maxIndex, maxIndex, cacheSize);
+    }
+
+    public static LogFile createReadFile(Path folder, IndexFile indexFile, int readIndex, int writeIndex, int maxIndex, int cacheSize) {
+        indexFile.reset(0, readIndex, writeIndex);
+        return new LogFile(folder, indexFile, maxIndex, cacheSize, 0);
+    }
+}
+
+@Getter
+class LogFile {
+    private Path path;
+    private int readIndex;
+    private int writeIndex;
+    private IndexFile indexFile;
+    private FileChannel channel;
+    private int fileIndex;
+    private int maxIndex;
+    private int cacheSize;
+
+    @SneakyThrows
+    public LogFile(Path path, IndexFile indexFile, int maxIndex, int cacheSize, int fileIndex) {
+        this.path = path;
+        this.indexFile = indexFile;
+        this.channel = FileChannel.open(path, WRITE, READ);
+        this.fileIndex = fileIndex;
+        this.readIndex = indexFile.readIndex(fileIndex);
+        this.writeIndex = indexFile.writeIndex(fileIndex);
+        this.maxIndex = maxIndex;
+        this.cacheSize = cacheSize;
+    }
+
+    @SneakyThrows
+    public boolean pollTo(@NonNull Bytes bytes) {
+        if (readIndex == writeIndex) {
+            return false;
+        }
+
+        val byteBuffer = ByteBuffer.wrap(bytes.array());
+        byteBuffer.position(0);
+        byteBuffer.limit(cacheSize);
+
+        int index = readIndex & (maxIndex - 1);
+
+        channel.read(byteBuffer, index * cacheSize);
+        readIndex++;
+        indexFile.readIndex(fileIndex, readIndex);
+        return true;
+    }
+
+    @SneakyThrows
+    public boolean write(@NonNull Bytes bytes) {
+        if (writeIndex - readIndex == maxIndex) {
+            return false;
+        }
+
+        ByteBuffer byteBuffer = ByteBuffer.wrap(bytes.array());
+        byteBuffer.position(0);
+        byteBuffer.limit(bytes.readableBytes());
+
+        int index = writeIndex & (maxIndex - 1);
+        channel.write(byteBuffer, index * cacheSize);
+
+        writeIndex++;
+        indexFile.writeIndex(fileIndex, writeIndex);
+        return true;
+    }
+}
+
+class IndexFile implements Closeable {
+
+    private MappedByteBuffer mbb;
+    private RandomAccessFile raf;
+
+    @SneakyThrows
+    public IndexFile(Path folder) {
+        Path indexPath = folder.resolve("log.index");
+
+        if (!Files.exists(indexPath)) {
+            Files.createFile(indexPath);
+        }
+
+        this.raf = new RandomAccessFile(indexPath.toFile(), "rwd");
+
+        //把文件映射到内存
+        this.mbb = this.raf.getChannel().map(FileChannel.MapMode.READ_WRITE, 0, 32);
+    }
+
+    public void writeIndex(int fileIndex, int index) {
+        int position = position(fileIndex) + 4;
+        mbb.putInt(position, index);
+    }
+
+    public void readIndex(int fileIndex, int index) {
+        mbb.putInt(position(fileIndex), index);
+    }
+
+    public int readIndex(int fileIndex) {
+        return mbb.getInt(position(fileIndex));
+    }
+
+    public int writeIndex(int fileIndex) {
+        return mbb.getInt(position(fileIndex) + 4);
+    }
+
+    public void reset(int fileIndex, int readIndex, int writeIndex) {
+        int position = position(fileIndex);
+        mbb.putInt(position, readIndex);
+        mbb.putInt(position + 4, writeIndex);
+    }
+
+    private int position(int fileIndex) {
+        return (fileIndex & 1) * 4;
+    }
+
+    @Override
+    public void close() {
+        safeClose(raf);
+    }
+}
+
+
+/*
 class FilesManager implements AutoCloseable {
 
     @Getter
@@ -400,7 +656,7 @@ class FilesManager implements AutoCloseable {
         queue.clear();
     }
 
-    public int getFileSize() {
+    public int getFileNum() {
         return queue.size();
     }
 
@@ -473,3 +729,4 @@ class FilesManager implements AutoCloseable {
         }
     }
 }
+*/

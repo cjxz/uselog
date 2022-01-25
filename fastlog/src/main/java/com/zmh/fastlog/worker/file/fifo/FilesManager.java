@@ -17,6 +17,7 @@ import static java.util.stream.Collectors.toCollection;
 
 public class FilesManager implements AutoCloseable {
 
+    @Getter
     private final AtomicInteger index;
 
     private final LinkedList<Path> queue;
@@ -102,13 +103,13 @@ public class FilesManager implements AutoCloseable {
             });
     }
 
-    Path getFile(int fileIndex) {
+    public Path getFile(int fileIndex) {
         val fileName = String.format(ENGLISH, "%s%d%s", prefix, fileIndex, suffix);
         return folder.resolve(fileName);
     }
 
     @SneakyThrows
-    Path createNextFile() {
+    public Path createNextFile() {
         Path result;
         do {
             val nextIndex = index.getAndIncrement();
@@ -120,16 +121,16 @@ public class FilesManager implements AutoCloseable {
         return result;
     }
 
-    Path first() {
+    public Path first() {
         return queue.peekFirst();
     }
 
-    Path last() {
+    public Path last() {
         return queue.peekLast();
     }
 
     @SneakyThrows
-    void remove(@NonNull Path... paths) {
+    public void remove(@NonNull Path... paths) {
         for (val path : paths) {
             Files.deleteIfExists(path);
             queue.remove(path);
