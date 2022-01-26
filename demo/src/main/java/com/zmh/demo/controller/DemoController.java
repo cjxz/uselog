@@ -36,7 +36,7 @@ public class DemoController {
         debugLog("end:" + getNowTime());
     }
 
-    private ThreadPoolExecutor pool = new ThreadPoolExecutor(3, 3, 0L,
+    private ThreadPoolExecutor pool = new ThreadPoolExecutor(2, 2, 0L,
         TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>());
 
     @GetMapping("testLog")
