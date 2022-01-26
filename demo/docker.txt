@@ -1,0 +1,7 @@
+docker run -d --log-driver json-file --log-opt max-size=100m --log-opt max-file=2  --name zookeeper -p 2181:2181 -v /etc/localtime:/etc/localtime wurstmeister/zookeeper
+
+docker run -d --log-driver json-file --log-opt max-size=100m --log-opt max-file=2 --name kafka -p 9092:9092 -e KAFKA_BROKER_ID=0 -e KAFKA_ZOOKEEPER_CONNECT=localhost/kafka -e KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092 -e KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:9092 -v /etc/localtime:/etc/localtime wurstmeister/kafka
+
+./kafka-topics.sh --list --zookeeper localhost:2181/kafka
+
+./kafka-topics.sh --create --zookeeper localhost:2181/kafka --topic log-test --replication-factor 1 --partitions 4
