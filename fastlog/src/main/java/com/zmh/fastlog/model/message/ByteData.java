@@ -4,6 +4,8 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import static java.util.Objects.isNull;
+
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
@@ -13,6 +15,9 @@ public class ByteData {
     private int dataLength;
 
     public int capacity() {
+        if (isNull(data)) {
+            return 0;
+        }
         return data.length;
     }
     public void switchData(ByteData byteData) {

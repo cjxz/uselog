@@ -28,17 +28,21 @@ public class FIFOQueue implements AutoCloseable {
      * 队列头 是 读缓冲区
      * 队列头的数据来源有两种场景：
      * 1、如果日志还没有多到需要放入磁盘的话，会将写缓冲区的日志数据直接复制队列头，这样写缓冲区可以继续写，读缓冲区可以从内存中读取，
-     *    注意：这里的写缓冲区的数据不一定是满的，因为当日志的写入和读取速度相当的时候，日志可以直接从写缓冲区中获取，而不一定是非得从读缓冲区中获取
+     * 注意：这里的写缓冲区的数据不一定是满的，因为当日志的写入和读取速度相当的时候，日志可以直接从写缓冲区中获取，而不一定是非得从读缓冲区中获取
      * 2、如果日志多到已经写入磁盘，那最早的日志数据一定在磁盘文件，此时需要从磁盘中读取文件写入该读缓冲区，供后续读取日志使用
      */
     private final BytesCacheQueue head;
 
     @SneakyThrows
-    FIFOQueue(String folder, int cacheSize, int maxFileCount) {
+    FIFOQueue(String folder, int cacheSize, int fileMaxCacheCount, int maxFileCount) {
+        if (Integer.bitCount(fileMaxCacheCount) != 1) {
+            throw new IllegalArgumentException("fileMaxCacheCount must be a power of 2");
+        }
+
         logFiles = LogFilesManager.builder()
             .folder(folder)
             .cacheSize(cacheSize)
-            .maxIndex(8)
+            .maxIndex(fileMaxCacheCount)
             .maxFileNum(maxFileCount)
             .build();
 

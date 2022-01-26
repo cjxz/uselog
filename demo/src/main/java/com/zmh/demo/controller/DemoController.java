@@ -1,6 +1,5 @@
 package com.zmh.demo.controller;
 
-import com.google.common.util.concurrent.RateLimiter;
 import com.zmh.fastlog.utils.ThreadUtils;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -15,7 +14,10 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
-import java.util.stream.IntStream;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import static com.zmh.fastlog.utils.Utils.debugLog;
 import static com.zmh.fastlog.utils.Utils.getNowTime;
@@ -24,8 +26,6 @@ import static java.util.Objects.nonNull;
 @RestController
 @Slf4j
 public class DemoController {
-
-    private RateLimiter limiter = RateLimiter.create(60_0000);
 
     @GetMapping("test")
     public void test() {
@@ -36,7 +36,11 @@ public class DemoController {
         debugLog("end:" + getNowTime());
     }
 
+    private ThreadPoolExecutor pool = new ThreadPoolExecutor(3, 3, 0L,
+        TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>());
+
     @GetMapping("testLog")
+    @SneakyThrows
     public void testLog() {
         debugLog("begin:" + getNowTime());
 
@@ -45,14 +49,18 @@ public class DemoController {
             text[i] = getText(100);
         }
 
-        IntStream.range(0, 100_0000)
-            .parallel()
-            .forEach(i -> {
-                log.info(text[i % 100]);
+        CountDownLatch taskLatch = new CountDownLatch(100_0000);
+        for (int i = 0; i < 100_0000; i++) {
+            int index = i % 100;
+            pool.execute(() -> {
+                log.info(text[index]);
+                taskLatch.countDown();
             });
-        debugLog("end:" + getNowTime());
+        }
+        //当前线程阻塞，等待计数器置为0
+        taskLatch.await();
 
-        ThreadUtils.sleep(100);
+        debugLog("end:" + getNowTime());
     }
 
     @GetMapping("/testKafka")

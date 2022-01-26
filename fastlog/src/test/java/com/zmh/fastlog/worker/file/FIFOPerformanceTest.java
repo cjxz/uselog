@@ -14,7 +14,7 @@ public class FIFOPerformanceTest extends BeforeDeleteFile {
     @Test
     public void testFIFOQueue() {
         //先写内存，再批量写磁盘，每个文件64MB
-        try (FIFOQueue fifo = new FIFOQueue("logs/cache", 64 * 1024 * 1024, 1600)) {
+        try (FIFOQueue fifo = new FIFOQueue("logs/cache", 64 * 1024 * 1024, 8, 1600)) {
             execute(fifo);
         }
     }

@@ -5,6 +5,7 @@ import lombok.*;
 
 import java.io.Closeable;
 import java.io.RandomAccessFile;
+import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
@@ -217,8 +218,17 @@ class LogFile implements Closeable {
         this.cacheSize = cacheSize;
     }
 
-    @SneakyThrows
     public boolean pollTo(@NonNull Bytes bytes) {
+        try {
+            return pollToEx(bytes);
+        } catch (BufferOverflowException exception) {
+            System.out.println(exception.getMessage());
+        }
+        return false;
+    }
+
+    @SneakyThrows
+    public boolean pollToEx(@NonNull Bytes bytes) {
         bytes.reset();
 
         if (readIndex == writeIndex) {

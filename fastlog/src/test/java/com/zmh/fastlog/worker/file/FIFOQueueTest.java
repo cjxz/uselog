@@ -9,13 +9,14 @@ import org.junit.Test;
 import java.util.Arrays;
 
 import static java.util.Objects.nonNull;
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 
 public class FIFOQueueTest extends BeforeDeleteFile {
 
     @Test
     public void testFIFOFileQueuePutAndGet() {
-        try (FIFOQueue fifoFile = new FIFOQueue("logs/cache",1024, 100)) {
+        try (FIFOQueue fifoFile = new FIFOQueue("logs/cache", 1024, 8, 100)) {
             long seq = 1L;
             ByteData byteData = getByteData(100);
 
@@ -31,7 +32,7 @@ public class FIFOQueueTest extends BeforeDeleteFile {
 
     @Test
     public void testFIFOFileQueuePutAndGetNum() {
-        try (FIFOQueue fifoFile = new FIFOQueue("logs/cache", 32 * 1024 * 1024, 100)) {
+        try (FIFOQueue fifoFile = new FIFOQueue("logs/cache", 32 * 1024 * 1024, 8, 100)) {
             long seq = 0L;
 
             ByteData byteData = getByteData(100);
