@@ -2,6 +2,7 @@ package com.zmh.fastlog.worker.file;
 
 import com.zmh.fastlog.model.message.ByteData;
 import com.zmh.fastlog.utils.ThreadUtils;
+import com.zmh.fastlog.worker.BeforeDeleteFile;
 import org.apache.commons.lang3.RandomUtils;
 import org.junit.Test;
 
@@ -10,7 +11,7 @@ import java.util.Arrays;
 import static java.util.Objects.nonNull;
 import static org.junit.Assert.*;
 
-public class FileWorkerTest {
+public class FileWorkerTest extends BeforeDeleteFile {
 
     @Test
     public void testFIFOFileQueuePutAndGet() {

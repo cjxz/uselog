@@ -3,8 +3,6 @@ package com.zmh.fastlog.worker.file;
 import com.zmh.fastlog.model.message.ByteData;
 import com.zmh.fastlog.worker.file.fifo.FilesManager;
 import io.appulse.utils.Bytes;
-import io.appulse.utils.ReadBytesUtils;
-import io.appulse.utils.WriteBytesUtils;
 import lombok.*;
 import org.apache.commons.lang3.time.StopWatch;
 
@@ -66,7 +64,7 @@ public class FIFOQueue implements AutoCloseable, FIFO {
             return;
         }
 
-        if (head.isEmpty() && getFileNum() == 0) {
+        if (head.isEmpty() && logFiles.isEmpty()) {
             tail.copyTo(head);
             tail.reset();
         } else {
@@ -91,7 +89,7 @@ public class FIFOQueue implements AutoCloseable, FIFO {
             return;
         }
 
-        if (getFileNum() > 0) {
+        if (!logFiles.isEmpty()) {
             logFiles.pollTo(head.getBytes());
             current = head.get();
             return;
@@ -264,7 +262,7 @@ class BytesCacheQueue {
 
 }
 
-class LogFiles implements AutoCloseable {
+/*class LogFiles implements AutoCloseable {
 
     private static final ExecutorService singleThreadExecutor = Executors.newSingleThreadExecutor();
 
@@ -343,13 +341,15 @@ class LogFiles implements AutoCloseable {
         singleThreadExecutor.shutdown();
     }
 
-}
+}*/
 
 class LogFileManager implements Closeable {
     private FilesManager filesManager;
 
+    @Getter
     private LogFile writeFile;
 
+    @Getter
     private LogFile readFile;
 
     private IndexFile indexFile;
@@ -360,7 +360,7 @@ class LogFileManager implements Closeable {
 
     private int maxFileNum;
 
-    private static final ExecutorService singleThreadExecutor = Executors.newSingleThreadExecutor();
+    private final ExecutorService singleThreadExecutor = Executors.newSingleThreadExecutor();
 
 
     @Builder
@@ -389,8 +389,8 @@ class LogFileManager implements Closeable {
     private void initWriteReadFile() {
         int fileSize = filesManager.getFileNum();
         if (fileSize > 0) {
-            int readIndex = indexFile.readIndex(0);
-            int writeIndex = indexFile.writeIndex(0);
+            int readIndex = indexFile.readIndex(1);
+            int writeIndex = indexFile.writeIndex(1);
 
             Path path = filesManager.last();
             if (readIndex >= writeIndex) {
@@ -400,8 +400,8 @@ class LogFileManager implements Closeable {
             }
 
             if (fileSize > 1) {
-                readIndex = indexFile.readIndex(1);
-                writeIndex = indexFile.writeIndex(1);
+                readIndex = indexFile.readIndex(0);
+                writeIndex = indexFile.writeIndex(0);
 
                 path = filesManager.first();
                 if (readIndex >= writeIndex) {
@@ -459,17 +459,25 @@ class LogFileManager implements Closeable {
         });
     }
 
+    public boolean isEmpty() {
+        return filesManager.getFileNum() == 0 || (filesManager.getFileNum() == 1 && writeFile.isEmpty());
+    }
+
     public int getFileSize() {
         return filesManager.getFileNum();
     }
 
     public int getTotalFile() {
-        return filesManager.getIndex().get() - 1;
+        return filesManager.getIndex().get();
     }
 
     @Override
     public void close() {
-
+        safeClose(filesManager);
+        safeClose(writeFile);
+        safeClose(readFile);
+        safeClose(indexFile);
+        singleThreadExecutor.shutdown();
     }
 }
 
@@ -494,7 +502,7 @@ class LogFileFactory {
 }
 
 @Getter
-class LogFile {
+class LogFile implements Closeable {
     private Path path;
     private int readIndex;
     private int writeIndex;
@@ -503,6 +511,7 @@ class LogFile {
     private int fileIndex;
     private int maxIndex;
     private int cacheSize;
+    private ByteBuffer lenBuffer = ByteBuffer.allocate(4);
 
     @SneakyThrows
     public LogFile(Path path, IndexFile indexFile, int maxIndex, int cacheSize, int fileIndex) {
@@ -518,17 +527,26 @@ class LogFile {
 
     @SneakyThrows
     public boolean pollTo(@NonNull Bytes bytes) {
+        bytes.reset();
+
         if (readIndex == writeIndex) {
             return false;
         }
 
+        int position = (readIndex & (maxIndex - 1)) * cacheSize;
+
+        lenBuffer.clear();
+        channel.read(lenBuffer, position);
+        lenBuffer.flip();
+        int len = lenBuffer.getInt();
+
         val byteBuffer = ByteBuffer.wrap(bytes.array());
         byteBuffer.position(0);
-        byteBuffer.limit(cacheSize);
+        byteBuffer.limit(len);
+        channel.read(byteBuffer, position + 4);
 
-        int index = readIndex & (maxIndex - 1);
+        bytes.writerIndex(len);
 
-        channel.read(byteBuffer, index * cacheSize);
         readIndex++;
         indexFile.readIndex(fileIndex, readIndex);
         return true;
@@ -540,16 +558,30 @@ class LogFile {
             return false;
         }
 
+        int position = (writeIndex & (maxIndex - 1)) * cacheSize;
+
+        lenBuffer.clear();
+        lenBuffer.putInt(bytes.readableBytes());
+        lenBuffer.rewind();
+        channel.write(lenBuffer, position);
+
         ByteBuffer byteBuffer = ByteBuffer.wrap(bytes.array());
         byteBuffer.position(0);
         byteBuffer.limit(bytes.readableBytes());
-
-        int index = writeIndex & (maxIndex - 1);
-        channel.write(byteBuffer, index * cacheSize);
+        channel.write(byteBuffer, position + 4);
 
         writeIndex++;
         indexFile.writeIndex(fileIndex, writeIndex);
         return true;
+    }
+
+    public boolean isEmpty() {
+        return readIndex == writeIndex;
+    }
+
+    @Override
+    public void close() {
+        safeClose(channel);
     }
 }
 
@@ -596,7 +628,7 @@ class IndexFile implements Closeable {
     }
 
     private int position(int fileIndex) {
-        return (fileIndex & 1) * 4;
+        return (fileIndex & 1) * 8;
     }
 
     @Override

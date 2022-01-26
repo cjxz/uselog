@@ -2,9 +2,8 @@ package com.zmh.fastlog.worker.file.fifo;
 
 import com.zmh.fastlog.model.message.ByteData;
 import com.zmh.fastlog.worker.BeforeDeleteFile;
-import com.zmh.fastlog.worker.file.fifo.IndexFile;
-import com.zmh.fastlog.worker.file.fifo.ReadWriteFile;
 import lombok.SneakyThrows;
+import org.junit.Before;
 import org.junit.Test;
 
 import java.nio.file.Files;
@@ -17,13 +16,23 @@ import static org.junit.Assert.*;
 
 public class ReadWriteFileTest extends BeforeDeleteFile {
 
+    private Path logFile;
+    private IndexFile indexFile;
+
+    @Before
+    @SneakyThrows
+    public void before() {
+        Path path = Paths.get(FOLDER);
+        Files.createDirectories(path);
+        this.indexFile = new IndexFile(path);
+
+        this.logFile = Paths.get(FOLDER + "/queue.log");
+        Files.createFile(logFile);
+    }
+
     @Test
     @SneakyThrows
     public void testWriteAndGetSingleTime() {
-        Path logFile = Paths.get("logs/cache/index-1.log");
-        Files.createFile(logFile);
-
-        IndexFile indexFile = new IndexFile(Paths.get("logs/cache"));
         try (ReadWriteFile rwf = createWriteFile(logFile, indexFile, 1 << 20)) {
             byte[] bytes = new byte[128];
             Arrays.fill(bytes, (byte) 40);
@@ -45,10 +54,6 @@ public class ReadWriteFileTest extends BeforeDeleteFile {
     @Test
     @SneakyThrows
     public void testWriteAndGetManyTime() {
-        Path logFile = Paths.get("logs/cache/index-1.log");
-        Files.createFile(logFile);
-
-        IndexFile indexFile = new IndexFile(Paths.get("logs/cache"));
         try (ReadWriteFile rwf = createWriteFile(logFile, indexFile, 1 << 20)) {
             byte[] bytes = new byte[128];
             Arrays.fill(bytes, (byte) 40);
@@ -77,10 +82,6 @@ public class ReadWriteFileTest extends BeforeDeleteFile {
     @Test
     @SneakyThrows
     public void testWriteOverSize() {
-        Path logFile = Paths.get("logs/cache/index-1.log");
-        Files.createFile(logFile);
-
-        IndexFile indexFile = new IndexFile(Paths.get("logs/cache"));
         try (ReadWriteFile rwf = createWriteFile(logFile, indexFile, 1024)) {
             byte[] bytes = new byte[128];
             Arrays.fill(bytes, (byte) 40);
@@ -110,10 +111,6 @@ public class ReadWriteFileTest extends BeforeDeleteFile {
     @Test
     @SneakyThrows
     public void testReadOverSize() {
-        Path logFile = Paths.get("logs/cache/index-1.log");
-        Files.createFile(logFile);
-
-        IndexFile indexFile = new IndexFile(Paths.get("logs/cache"));
         try (ReadWriteFile rwf = createWriteFile(logFile, indexFile, 1024)) {
             byte[] bytes = new byte[128];
             Arrays.fill(bytes, (byte) 40);

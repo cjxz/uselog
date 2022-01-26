@@ -8,9 +8,11 @@ import static java.util.Objects.isNull;
 
 public class BeforeDeleteFile {
 
+    protected static final String FOLDER = "logs/cache";
+
     @Before
-    public void before() {
-        deleteFile(new File("logs/cache"));
+    public void beforeDelete() {
+        deleteFile(new File(FOLDER));
     }
 
     @SuppressWarnings("ResultOfMethodCallIgnored")
