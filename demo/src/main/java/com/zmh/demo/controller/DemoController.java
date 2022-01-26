@@ -30,7 +30,7 @@ import static java.util.Objects.nonNull;
 @RestController
 @Slf4j
 public class DemoController {
-    private RateLimiter limiter = RateLimiter.create(60_0000);
+    private RateLimiter limiter = RateLimiter.create(10000);
 
     @GetMapping("test")
     public void test() {
@@ -56,20 +56,23 @@ public class DemoController {
         }
 
         CountDownLatch taskLatch = new CountDownLatch(100_0000);
-        for (int i = 0; i < 100_0000; i++) {
+        for (int i = 0; i < 1_0000; i++) {
             limiter.acquire();
-            int index = i % 100;
-            pool.execute(() -> {
-                log.info(text[index]);
-                taskLatch.countDown();
-            });
+
+            for (int j = 0; j < 100; j++) {
+                int index = j;
+                pool.execute(() -> {
+                    log.info(text[index]);
+                    taskLatch.countDown();
+                });
+            }
         }
         //当前线程阻塞，等待计数器置为0
         taskLatch.await();
 
         stopWatch.stop();
         long time = stopWatch.getTime(TimeUnit.MILLISECONDS);
-        debugLog("耗时：" + time + " QPS/s:" + new BigDecimal(100000).divide(new BigDecimal(time), 2, HALF_UP));
+        debugLog("耗时：" + time + " " + new BigDecimal(100000).divide(new BigDecimal(time), 2, HALF_UP) + "w/QPS");
     }
 
     @GetMapping("/testKafka")
