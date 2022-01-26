@@ -1,15 +1,18 @@
 package com.zmh.demo.controller;
 
+import com.google.common.util.concurrent.RateLimiter;
 import com.zmh.fastlog.utils.ThreadUtils;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.time.DateFormatUtils;
+import org.apache.commons.lang3.time.StopWatch;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.math.BigDecimal;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
@@ -21,11 +24,13 @@ import java.util.concurrent.TimeUnit;
 
 import static com.zmh.fastlog.utils.Utils.debugLog;
 import static com.zmh.fastlog.utils.Utils.getNowTime;
+import static java.math.RoundingMode.HALF_UP;
 import static java.util.Objects.nonNull;
 
 @RestController
 @Slf4j
 public class DemoController {
+    private RateLimiter limiter = RateLimiter.create(60_0000);
 
     @GetMapping("test")
     public void test() {
@@ -36,13 +41,14 @@ public class DemoController {
         debugLog("end:" + getNowTime());
     }
 
-    private ThreadPoolExecutor pool = new ThreadPoolExecutor(2, 2, 0L,
+    private ThreadPoolExecutor pool = new ThreadPoolExecutor(4, 4, 0L,
         TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>());
 
     @GetMapping("testLog")
     @SneakyThrows
     public void testLog() {
-        debugLog("begin:" + getNowTime());
+        StopWatch stopWatch = new StopWatch();
+        stopWatch.start();
 
         String[] text = new String[100];
         for (int i = 0; i < 100; i++) {
@@ -51,6 +57,7 @@ public class DemoController {
 
         CountDownLatch taskLatch = new CountDownLatch(100_0000);
         for (int i = 0; i < 100_0000; i++) {
+            limiter.acquire();
             int index = i % 100;
             pool.execute(() -> {
                 log.info(text[index]);
@@ -60,7 +67,9 @@ public class DemoController {
         //当前线程阻塞，等待计数器置为0
         taskLatch.await();
 
-        debugLog("end:" + getNowTime());
+        stopWatch.stop();
+        long time = stopWatch.getTime(TimeUnit.MILLISECONDS);
+        debugLog("耗时：" + time + " QPS/s:" + new BigDecimal(100000).divide(new BigDecimal(time), 2, HALF_UP));
     }
 
     @GetMapping("/testKafka")
