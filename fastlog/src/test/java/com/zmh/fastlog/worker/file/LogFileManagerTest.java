@@ -14,7 +14,7 @@ public class LogFileManagerTest extends BeforeDeleteFile {
     @Test
     @SneakyThrows
     public void writeAndReadSingleTimeTest() {
-        try (LogFileManager manager = new LogFileManager(FOLDER, CACHE_SIZE, 4, 10)) {
+        try (LogFilesManager manager = new LogFilesManager(FOLDER, CACHE_SIZE, 4, 10)) {
             Bytes bytes = getBytes();
             int length = bytes.readableBytes();
 
@@ -32,7 +32,7 @@ public class LogFileManagerTest extends BeforeDeleteFile {
     @Test
     @SneakyThrows
     public void writeAndReadManyTimeInOneFileTest() {
-        try (LogFileManager manager = new LogFileManager(FOLDER, CACHE_SIZE, 4, 10)) {
+        try (LogFilesManager manager = new LogFilesManager(FOLDER, CACHE_SIZE, 4, 10)) {
             Bytes bytes = getBytes();
             int length = bytes.readableBytes();
 
@@ -54,7 +54,7 @@ public class LogFileManagerTest extends BeforeDeleteFile {
     @Test
     @SneakyThrows
     public void writeAndReadManyTimeInManyFileTest() {
-        try (LogFileManager manager = new LogFileManager(FOLDER, CACHE_SIZE, 4, 10)) {
+        try (LogFilesManager manager = new LogFilesManager(FOLDER, CACHE_SIZE, 4, 10)) {
             Bytes bytes = getBytes();
             int length = bytes.readableBytes();
 
@@ -86,13 +86,13 @@ public class LogFileManagerTest extends BeforeDeleteFile {
         Bytes bytes = getBytes();
         int length = bytes.readableBytes();
 
-        try (LogFileManager manager = new LogFileManager(FOLDER, CACHE_SIZE, 4, 10)) {
+        try (LogFilesManager manager = new LogFilesManager(FOLDER, CACHE_SIZE, 4, 10)) {
             for (int i = 0; i < 10; i++) {
                 manager.write(bytes).get();
             }
         }
 
-        try (LogFileManager manager = new LogFileManager(FOLDER, CACHE_SIZE, 4, 10)) {
+        try (LogFilesManager manager = new LogFilesManager(FOLDER, CACHE_SIZE, 4, 10)) {
             assertNotNull(manager.getWriteFile());
             assertNotNull(manager.getReadFile());
             assertEquals(3, manager.getFileSize());
@@ -113,7 +113,7 @@ public class LogFileManagerTest extends BeforeDeleteFile {
         Bytes bytes = getBytes();
         int length = bytes.readableBytes();
 
-        try (LogFileManager manager = new LogFileManager(FOLDER, CACHE_SIZE, 4, 10)) {
+        try (LogFilesManager manager = new LogFilesManager(FOLDER, CACHE_SIZE, 4, 10)) {
             for (int i = 0; i < 10; i++) {
                 manager.write(bytes).get();
             }
@@ -124,7 +124,7 @@ public class LogFileManagerTest extends BeforeDeleteFile {
             assertEquals(3, manager.getFileSize());
         }
 
-        try (LogFileManager manager = new LogFileManager(FOLDER, CACHE_SIZE, 4, 10)) {
+        try (LogFilesManager manager = new LogFilesManager(FOLDER, CACHE_SIZE, 4, 10)) {
             assertNotNull(manager.getWriteFile());
             assertNull(manager.getReadFile());
             assertEquals(2, manager.getFileSize());

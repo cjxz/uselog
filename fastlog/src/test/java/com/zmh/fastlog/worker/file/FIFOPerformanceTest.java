@@ -2,7 +2,6 @@ package com.zmh.fastlog.worker.file;
 
 import com.zmh.fastlog.model.message.ByteData;
 import com.zmh.fastlog.worker.BeforeDeleteFile;
-import com.zmh.fastlog.worker.file.fifo.FIFOFile;
 import lombok.SneakyThrows;
 import org.apache.commons.lang3.time.StopWatch;
 import org.junit.Test;
@@ -20,15 +19,7 @@ public class FIFOPerformanceTest extends BeforeDeleteFile {
         }
     }
 
-    @Test
-    public void testFIFOFile() {
-        //直接写磁盘 每个文件1GB
-        try (FIFOFile fifo = new FIFOFile("logs/cache", 1024 * 1024 * 1024, 100)) {
-            execute(fifo);
-        }
-    }
-
-    private void execute(FIFO fifo) {
+    private void execute(FIFOQueue fifo) {
         StopWatch watch = new StopWatch();
         long seq = 1L;
 
@@ -36,7 +27,7 @@ public class FIFOPerformanceTest extends BeforeDeleteFile {
         ByteData byteEvent = new ByteData(0, bytes, bytes.length);
 
         watch.start();
-        int total = 10000;
+        int total = 1000;
         for (int i = 0; i < total; i++) {
             for (int j = 0; j < 10000; j++) {
                 byteEvent.setId(seq++);
@@ -54,6 +45,7 @@ public class FIFOPerformanceTest extends BeforeDeleteFile {
         System.out.println(total / watch.getTime(TimeUnit.SECONDS) + "w/QPS");
     }
 
+    @SuppressWarnings("SameParameterValue")
     private String getText(int size) {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < size; i++) {
