@@ -96,7 +96,7 @@ class FastLog implements Closeable {
                 producer = new KafkaProducer(config.getUrl(), config.getTopic(), config.getBatchSize());
             }
             mqWorker = new MqWorker(producer, config.getBatchMessageSize());
-            fileWorker = new FileWorker(mqWorker, config.getFileMemoryCacheSize(), config.getFileMaxCacheCount(), config.getMaxFileCount(), config.getFileCacheFolder());
+            fileWorker = new FileWorker(mqWorker, config.getBatchMessageSize(), config.getFileMemoryCacheSize(), config.getFileMaxCacheCount(), config.getMaxFileCount(), config.getFileCacheFolder());
             logWorker = new LogWorker(mqWorker, fileWorker, config.getBatchMessageSize(), config.getMaxMsgSize());
         } catch (Exception ex) {
             this.close();

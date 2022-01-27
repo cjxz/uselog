@@ -20,18 +20,18 @@ public class FileWorker extends AbstractWorker<ByteData, EventSlot>
     private final Disruptor<EventSlot> queue;
     private final RingBuffer<EventSlot> ringBuffer;
     private final FIFOQueue fifo;
-    private static final int BUFFER_SIZE = 2048;
-    private static final int HIGH_WATER_LEVEL_FILE = 1024;
+    private final int HIGH_WATER_LEVEL_FILE;
 
     private volatile boolean isClose;
 
-    public FileWorker(MqWorker mqWorker, int cacheSize, int fileMaxCacheCount, int maxFileCount, String folder) {
+    public FileWorker(MqWorker mqWorker, int batchSize, int cacheSize, int fileMaxCacheCount, int maxFileCount, String folder) {
         fifo = new FIFOQueue(folder, cacheSize, fileMaxCacheCount, maxFileCount);
 
         this.mqWorker = mqWorker;
+        this.HIGH_WATER_LEVEL_FILE = batchSize;
         queue = new Disruptor<>(
             EventSlot::new,
-            BUFFER_SIZE,
+            batchSize << 1,
             namedDaemonThreadFactory("log-file-worker"),
             ProducerType.SINGLE,
             new LiteTimeoutBlockingWaitStrategy(100, MILLISECONDS)
@@ -76,7 +76,7 @@ public class FileWorker extends AbstractWorker<ByteData, EventSlot>
 
         long time = stopWatch.getTime();
         long length = ringBuffer.getCursor() - sequence;
-        if (time > 0 || length > 1600) {
+        if (time > 0 || length > HIGH_WATER_LEVEL_FILE * 1.8) {
             System.out.println("file length " + length + " before" + before + " count:" + count + " time:" + time);
         }
     }

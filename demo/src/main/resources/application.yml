@@ -4,6 +4,5 @@ fastlog:
   enable: true
   url: 192.168.162.21:9092
   topic: log-test
-  batchMessageSize: 4096
   type: kafka
   partition: 4

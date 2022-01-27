@@ -18,7 +18,7 @@ public class FastLogConfig {
 
     /**
      * mq一批发送多少条日志
-     * 默认：128
+     * 默认：1024
      */
     private int batchMessageSize;
 
