@@ -106,7 +106,11 @@ public class LogFilesManager implements Closeable {
     }
 
     @SneakyThrows
-    public void pollTo(@NonNull Bytes bytes) {
+    public Future<?> pollTo(@NonNull Bytes bytes) {
+        return singleThreadExecutor.submit(() -> pollToBytes(bytes));
+    }
+
+    private void pollToBytes(Bytes bytes) {
         if (isNull(readFile)) {
             if (filesManager.getFileNum() == 1) {
                 writeFile.pollTo(bytes);
@@ -120,7 +124,7 @@ public class LogFilesManager implements Closeable {
         if (!readFile.pollTo(bytes)) {
             filesManager.remove(readFile.getPath());
             readFile = null;
-            pollTo(bytes);
+            pollToBytes(bytes);
         }
     }
 

@@ -31,7 +31,7 @@ public class FIFOQueue implements AutoCloseable {
      * 注意：这里的写缓冲区的数据不一定是满的，因为当日志的写入和读取速度相当的时候，日志可以直接从写缓冲区中获取，而不一定是非得从读缓冲区中获取
      * 2、如果日志多到已经写入磁盘，那最早的日志数据一定在磁盘文件，此时需要从磁盘中读取文件写入该读缓冲区，供后续读取日志使用
      */
-    private final BytesCacheQueue head;
+    private final BytesCacheQueueFlush head;
 
     @SneakyThrows
     FIFOQueue(String folder, int cacheSize, int fileMaxCacheCount, int maxFileCount) {
@@ -47,7 +47,7 @@ public class FIFOQueue implements AutoCloseable {
             .build();
 
         tail = new TwoBytesCacheQueue(cacheSize);
-        head = new BytesCacheQueue(cacheSize);
+        head = new BytesCacheQueueFlush(cacheSize);
     }
 
     public void put(ByteData byteData) {
@@ -55,8 +55,8 @@ public class FIFOQueue implements AutoCloseable {
             return;
         }
 
-        if (head.isEmpty() && logFiles.isEmpty()) {
-            tail.copyTo(head);
+        if (head.getQueue().isEmpty() && logFiles.isEmpty()) {
+            tail.copyTo(head.getQueue());
             tail.reset();
         } else {
             flush();
@@ -75,14 +75,20 @@ public class FIFOQueue implements AutoCloseable {
     }
 
     public void next() {
-        current = head.get();
+        if (head.inFlush()) {
+            current = null;
+            return;
+        }
+
+        current = head.getQueue().get();
         if (nonNull(current)) {
             return;
         }
 
         if (!logFiles.isEmpty()) {
-            logFiles.pollTo(head.getBytes());
-            current = head.get();
+            Future<?> future = logFiles.pollTo(head.getQueue().getBytes());
+            head.flush(future);
+            current = null;
             return;
         }
 
@@ -178,6 +184,10 @@ class BytesCacheQueueFlush {
 
     public void flush(Future<?> future) {
         this.future = future;
+    }
+
+    public boolean inFlush() {
+        return nonNull(future) && !future.isDone();
     }
 
     @SneakyThrows

@@ -137,7 +137,7 @@ public class LogWorker extends AbstractWorker<Object, EventSlot>
                 if (ringBuffer.getCursor() - sequence >= highWaterLevelMq) {
                     break;
                 }
-                ThreadUtils.sleep(1);
+                ThreadUtils.sleep(5);
             }
             // 写入失败, 切换到本地文件缓冲区
             if (!success && directWriteToMq) {
@@ -154,7 +154,7 @@ public class LogWorker extends AbstractWorker<Object, EventSlot>
                 if (ringBuffer.getCursor() - sequence >= highWaterLevelMq) {
                     break;
                 }
-                ThreadUtils.sleep(1);
+                ThreadUtils.sleep(5);
             }
         }
 

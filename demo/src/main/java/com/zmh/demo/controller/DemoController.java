@@ -30,7 +30,7 @@ import static java.util.Objects.nonNull;
 @RestController
 @Slf4j
 public class DemoController {
-    private RateLimiter limiter = RateLimiter.create(10000);
+    private RateLimiter limiter = RateLimiter.create(20);
 
     @GetMapping("test")
     public void test() {
@@ -56,11 +56,11 @@ public class DemoController {
         }
 
         CountDownLatch taskLatch = new CountDownLatch(100_0000);
-        for (int i = 0; i < 1_0000; i++) {
+        for (int i = 0; i < 100; i++) {
             limiter.acquire();
 
-            for (int j = 0; j < 100; j++) {
-                int index = j;
+            for (int j = 0; j < 10000; j++) {
+                int index = j % 100;
                 pool.execute(() -> {
                     log.info(text[index]);
                     taskLatch.countDown();
