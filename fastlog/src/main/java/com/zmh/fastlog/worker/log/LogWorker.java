@@ -151,7 +151,7 @@ public class LogWorker extends AbstractWorker<Object, EventSlot>
                 if (isClosed) {
                     break;
                 }
-                if (ringBuffer.getCursor() - sequence >= highWaterLevelMq) {
+                if (ringBuffer.getCursor() - sequence >= highWaterLevelFile) {
                     break;
                 }
                 ThreadUtils.sleep(5);

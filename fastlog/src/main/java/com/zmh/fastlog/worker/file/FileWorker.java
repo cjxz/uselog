@@ -20,8 +20,8 @@ public class FileWorker extends AbstractWorker<ByteData, EventSlot>
     private final Disruptor<EventSlot> queue;
     private final RingBuffer<EventSlot> ringBuffer;
     private final FIFOQueue fifo;
-    private static final int BUFFER_SIZE = 1024;
-    private static final int HIGH_WATER_LEVEL_FILE = 512;
+    private static final int BUFFER_SIZE = 2048;
+    private static final int HIGH_WATER_LEVEL_FILE = 1024;
 
     private volatile boolean isClose;
 
@@ -76,7 +76,7 @@ public class FileWorker extends AbstractWorker<ByteData, EventSlot>
 
         long time = stopWatch.getTime();
         long length = ringBuffer.getCursor() - sequence;
-        if (time > 0 || length > 900) {
+        if (time > 0 || length > 1600) {
             System.out.println("file length " + length + " before" + before + " count:" + count + " time:" + time);
         }
     }

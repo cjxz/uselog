@@ -1,6 +1,5 @@
 package com.zmh.demo.controller;
 
-import com.google.common.util.concurrent.RateLimiter;
 import com.zmh.fastlog.utils.ThreadUtils;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -30,7 +29,6 @@ import static java.util.Objects.nonNull;
 @RestController
 @Slf4j
 public class DemoController {
-    private RateLimiter limiter = RateLimiter.create(20);
 
     @GetMapping("test")
     public void test() {
@@ -56,16 +54,13 @@ public class DemoController {
         }
 
         CountDownLatch taskLatch = new CountDownLatch(100_0000);
-        for (int i = 0; i < 100; i++) {
-            limiter.acquire();
+        for (int i = 0; i < 100_0000; i++) {
+            int index = i % 100;
+            pool.execute(() -> {
+                log.info(text[index]);
+                taskLatch.countDown();
+            });
 
-            for (int j = 0; j < 10000; j++) {
-                int index = j % 100;
-                pool.execute(() -> {
-                    log.info(text[index]);
-                    taskLatch.countDown();
-                });
-            }
         }
         //当前线程阻塞，等待计数器置为0
         taskLatch.await();
