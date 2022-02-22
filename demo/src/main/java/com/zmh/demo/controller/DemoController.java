@@ -17,8 +17,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
 import static com.zmh.fastlog.utils.Utils.debugLog;
@@ -30,6 +29,8 @@ import static java.util.Objects.nonNull;
 @Slf4j
 public class DemoController {
 
+    private final static ThreadFactory threadFactory = ThreadUtils.namedDaemonThreadFactory("DemoController");
+
     @GetMapping("test")
     public void test() {
         debugLog("begin:" + getNowTime());
@@ -39,9 +40,6 @@ public class DemoController {
         debugLog("end:" + getNowTime());
     }
 
-    private ThreadPoolExecutor pool = new ThreadPoolExecutor(4, 4, 0L,
-        TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>());
-
     @GetMapping("testLog")
     @SneakyThrows
     public void testLog() {
@@ -50,24 +48,25 @@ public class DemoController {
 
         String[] text = new String[100];
         for (int i = 0; i < 100; i++) {
-            text[i] = getText(100);
+            text[i] = getText(100 + i);
         }
 
-        CountDownLatch taskLatch = new CountDownLatch(100_0000);
-        for (int i = 0; i < 100_0000; i++) {
-            int index = i % 100;
-            pool.execute(() -> {
-                log.info(text[index]);
-                taskLatch.countDown();
-            });
-
+        CountDownLatch taskLatch = new CountDownLatch(400_0000);
+        for (int i = 0; i < 4; i++) {
+            threadFactory.newThread(() -> {
+                for (int j = 0; j < 100_0000; j++) {
+                    int index = j % 100;
+                    log.info(text[index]);
+                    taskLatch.countDown();
+                }
+            }).start();
         }
         //当前线程阻塞，等待计数器置为0
         taskLatch.await();
 
         stopWatch.stop();
         long time = stopWatch.getTime(TimeUnit.MILLISECONDS);
-        debugLog("耗时：" + time + " " + new BigDecimal(100000).divide(new BigDecimal(time), 2, HALF_UP) + "w/QPS");
+        debugLog("耗时：" + time + " " + new BigDecimal(400000).divide(new BigDecimal(time), 2, HALF_UP) + "w/QPS");
     }
 
     @GetMapping("/testKafka")

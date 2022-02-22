@@ -5,8 +5,8 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.classic.spi.ThrowableProxyUtil;
 import com.zmh.fastlog.model.message.ByteData;
 import com.zmh.fastlog.utils.JsonByteBuilder;
-import org.apache.commons.lang3.time.FastDateFormat;
 
+import java.util.Calendar;
 import java.util.Map;
 
 import static com.zmh.fastlog.worker.log.MessageConverter.Consts.*;
@@ -16,7 +16,8 @@ import static java.util.Objects.nonNull;
 public class MessageConverter {
 
     private final ThreadLocal<JsonByteBuilder> threadLocal = new ThreadLocal<>();
-    private final FastDateFormat dateFormat = FastDateFormat.getInstance("yyyy-MM-dd HH:mm:ss.SSS");
+
+    private final Calendar calendar = new Calendar.Builder().build();
 
     //最大的日志长度，单位字节，大于这个长度截取
     private final int maxMsgSize;
@@ -37,9 +38,10 @@ public class MessageConverter {
             .key(DATA_LEVEL).value(log.getLevel().levelStr);
 
         long timeStamp = log.getTimeStamp();
+        calendar.setTimeInMillis(timeStamp);
         jsonByteBuilder
-            .key(DATA_TIME_MILLSECOND).value(timeStamp)
-            .key(DATA_TIMESTAMP).value(dateFormat.format(timeStamp));
+            .key(DATA_TIMESTAMP).value(calendar)
+            .key(DATA_TIME_MILLSECOND).value(timeStamp);
 
         if (nonNull(log.getMarker())) {
             jsonByteBuilder

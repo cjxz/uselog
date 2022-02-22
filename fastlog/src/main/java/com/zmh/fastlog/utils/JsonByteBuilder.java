@@ -2,6 +2,8 @@ package com.zmh.fastlog.utils;
 
 import lombok.NonNull;
 
+import java.util.Calendar;
+
 import static com.zmh.fastlog.utils.Utils.marginToBuffer;
 import static java.util.Objects.isNull;
 
@@ -76,6 +78,35 @@ public class JsonByteBuilder {
         return value(value, value.length());
     }
 
+    public JsonByteBuilder value(Calendar calendar) {
+        ensureCapacity(30);
+        this.bufferArray[pos++] = (byte) '"';
+
+        writeYear(calendar.get(Calendar.YEAR));
+        this.bufferArray[pos++] = (byte) '-';
+
+        writeTwoDigit(calendar.get(Calendar.MONTH) + 1);
+        this.bufferArray[pos++] = (byte) '-';
+
+        writeTwoDigit(calendar.get(Calendar.DAY_OF_MONTH));
+        this.bufferArray[pos++] = (byte) ' ';
+
+        writeTwoDigit(calendar.get(Calendar.HOUR_OF_DAY));
+        this.bufferArray[pos++] = (byte) ':';
+
+        writeTwoDigit(calendar.get(Calendar.MINUTE));
+        this.bufferArray[pos++] = (byte) ':';
+
+        writeTwoDigit(calendar.get(Calendar.SECOND));
+        this.bufferArray[pos++] = (byte) '.';
+
+        writeThreeDigit(calendar.get(Calendar.MILLISECOND));
+
+        this.bufferArray[pos++] = (byte) '"';
+        this.bufferArray[pos++] = (byte) ',';
+        return this;
+    }
+
     public JsonByteBuilder value(String value, int maxLength) {
         if (isNull(value)) {
             writeString("null");
@@ -86,6 +117,89 @@ public class JsonByteBuilder {
         }
         addAscii((byte) ',');
         return this;
+    }
+
+    private void writeYear(int year) {
+        byte[] arr = this.bufferArray;
+        int pos = this.pos;
+
+        if (0 == year) {
+            arr[pos++] = 48; // 48 = 0
+            this.pos = pos;
+            return;
+        }
+        int begin = pos;
+        while (year > 0) {
+            int n = year % 10;
+            year /= 10;
+            arr[pos++] = (byte) (n | 0x30);
+        }
+        this.pos = pos;
+        int end = pos - 1;
+        while (begin < end) {
+            byte t = arr[begin];
+            arr[begin] = arr[end];
+            arr[end] = t;
+            begin++;
+            end--;
+        }
+    }
+
+    private void writeTwoDigit(int value) {
+        byte[] arr = this.bufferArray;
+        int pos = this.pos;
+
+        if (0 == value) {
+            arr[pos++] = 48; // 48 = 0
+            arr[pos++] = 48; // 48 = 0
+        } else if (value < 10) {
+            arr[pos++] = 48; // 48 = 0
+            arr[pos++] = (byte) (value | 0x30);
+        } else {
+            int n = value % 10;
+            value /= 10;
+
+            arr[pos++] = (byte) (value | 0x30);
+            arr[pos++] = (byte) (n | 0x30);
+        }
+        this.pos = pos;
+    }
+
+    private void writeThreeDigit(int value) {
+        byte[] arr = this.bufferArray;
+        int pos = this.pos;
+
+        if (0 == value) {
+            arr[pos++] = 48; // 48 = 0
+            arr[pos++] = 48; // 48 = 0
+            arr[pos++] = 48; // 48 = 0
+            this.pos = pos;
+        } else if (value < 10) {
+            arr[pos++] = 48; // 48 = 0
+            arr[pos++] = 48; // 48 = 0
+            arr[pos++] = (byte) (value | 0x30);
+            this.pos = pos;
+        } else if (value < 100) {
+            arr[pos++] = 48; // 48 = 0
+
+            int n = value % 10;
+            value /= 10;
+
+            arr[pos++] = (byte) (value | 0x30);
+            arr[pos++] = (byte) (n | 0x30);
+            this.pos = pos;
+        } else {
+            int n = value % 10;
+            value /= 10;
+            arr[pos + 2] = (byte) (n | 0x30);
+
+            n = value % 10;
+            value /= 10;
+            arr[pos + 1] = (byte) (n | 0x30);
+            arr[pos] = (byte) (value | 0x30);
+
+            this.pos = pos + 3;
+        }
     }
 
     public JsonByteBuilder value(long value) {

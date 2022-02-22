@@ -19,13 +19,31 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.1</version>
                 <configuration>
-                    <source>8</source>
-                    <target>8</target>
+                    <!-- 源代码使用的开发版本 -->
+                    <source>1.8</source>
+                    <!-- 需要生成的目标class文件的编译版本 -->
+                    <target>1.8</target>
                 </configuration>
             </plugin>
         </plugins>
     </build>
+
+
+    <repositories>
+        <repository>
+            <id>nexus_public</id>
+            <url>http://maven.tuhu.work:8081/nexus/content/groups/public/</url>
+        </repository>
+    </repositories>
+
+    <pluginRepositories>
+        <pluginRepository>
+            <id>nexus_public</id>
+            <url>http://maven.tuhu.work:8081/nexus/content/groups/public/</url>
+        </pluginRepository>
+    </pluginRepositories>
 
 
 </project>

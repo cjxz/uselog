@@ -15,6 +15,7 @@
 
     <root level="INFO">
         <appender-ref ref="FAST_LOG"/>
+        <appender-ref ref="STDOUT"/>
     </root>
 
 

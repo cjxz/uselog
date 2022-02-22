@@ -67,6 +67,8 @@ public class KafkaProducer implements MqProducer {
         heartbeatFuture = scheduleWithFixedDelay(this::heartbeat, 0, 2, SECONDS);
     }
 
+    //private AtomicInteger count = new AtomicInteger(0);
+
     @Override
     public void sendEvent(EventSlot event) {
         ByteData byteData = event.getByteData();
@@ -75,11 +77,23 @@ public class KafkaProducer implements MqProducer {
         buffer.limit(byteData.getDataLength());
         ProducerRecord<String, ByteBuffer> record = new ProducerRecord<>(topic, buffer);
 
+        //int size = byteData.getDataLength();
+        //int index = count.addAndGet(size);
+
         producer.send(record, (metadata, e) -> {
             if (nonNull(e)) {
                 addMissingCount(e);
             }
+            //count.getAndAdd(-size);
         });
+
+       /* if (index >= 1000) {
+            try {
+                future.get();
+            } catch (Exception e) {
+                addMissingCount(e);
+            }
+        }*/
 
         event.clear();
     }
@@ -106,6 +120,7 @@ public class KafkaProducer implements MqProducer {
         // todo zmh serial
         ProducerRecord<String, ByteBuffer> record = new ProducerRecord<>(topic, ByteBuffer.wrap("heartbeat".getBytes()));
         Future<RecordMetadata> future = producer.send(record);
+
         try {
             if (nonNull(future.get())) {
                 this.isReady = true;

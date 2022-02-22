@@ -17,7 +17,7 @@ import static java.util.Objects.nonNull;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
-import static org.apache.pulsar.client.api.CompressionType.ZLIB;
+import static org.apache.pulsar.client.api.CompressionType.LZ4;
 import static org.apache.pulsar.client.api.Schema.BYTES;
 
 public class PulsarProducer implements MqProducer {
@@ -76,7 +76,7 @@ public class PulsarProducer implements MqProducer {
                     .blockIfQueueFull(true)
                     .maxPendingMessages(batchMessageSize << 1)
                     .sendTimeout(30, SECONDS)
-                    .compressionType(ZLIB)
+                    .compressionType(LZ4)
                     .create();
             }
         } catch (PulsarClientException e) {

@@ -3,6 +3,8 @@ package com.zmh.fastlog.utils;
 import lombok.SneakyThrows;
 import org.junit.Test;
 
+import java.util.Calendar;
+
 import static org.junit.Assert.assertEquals;
 
 public class JsonByteBuilderTest { //todo zmh 加一个ensure的单元测试
@@ -23,24 +25,25 @@ public class JsonByteBuilderTest { //todo zmh 加一个ensure的单元测试
 
     @Test
     public void testNullObject() {
+        String nullValue = null;
         JsonByteBuilder builder = JsonByteBuilder.create()
             .beginObject()
-            .key("hi").value(null)
+            .key("hi").value(nullValue)
             .endObject();
         String s = builder.toString();
         assertEquals("{\"hi\":null}", s);
 
         builder.clear()
             .beginObject()
-            .key("hi").value(null)
+            .key("hi").value(nullValue)
             .endObject();
         s = builder.toString();
         assertEquals("{\"hi\":null}", s);
 
         builder.clear()
             .beginObject()
-            .key("hi").value(null)
-            .key("ok").value(null)
+            .key("hi").value(nullValue)
+            .key("ok").value(nullValue)
             .endObject();
         s = builder.toString();
         assertEquals("{\"hi\":null,\"ok\":null}", s);
@@ -64,5 +67,23 @@ public class JsonByteBuilderTest { //todo zmh 加一个ensure的单元测试
             .endObject()
             .toString();
         assertEquals("{\"key\":\"valuevalue中\"}", json);
+    }
+
+    @Test
+    public void testCalender() {
+        Calendar calendar = new Calendar.Builder().build();
+        calendar.setTimeInMillis(1669827601000L);
+
+        JsonByteBuilder builder = JsonByteBuilder.create()
+            .beginObject()
+            .key("key1").value(calendar);
+
+        calendar.setTimeInMillis(1640970001111L);
+        String json = builder
+            .key("key2").value(calendar)
+            .endObject()
+            .toString();
+
+        assertEquals("{\"key1\":\"2022-12-01 01:00:01.000\",\"key2\":\"2022-01-01 01:00:01.111\"}", json);
     }
 }

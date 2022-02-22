@@ -51,7 +51,7 @@ public class FileWorker extends AbstractWorker<ByteData, EventSlot>
         fifo.put(event.getByteData());
         event.clear();
 
-        if (notifySeq(sequence)) {
+        if (notifySeq(sequence) || endOfBatch) {
             onTimeout(sequence);
         }
     }
