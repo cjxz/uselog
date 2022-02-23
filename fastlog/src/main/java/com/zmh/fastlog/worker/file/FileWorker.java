@@ -7,7 +7,6 @@ import com.zmh.fastlog.model.event.EventSlot;
 import com.zmh.fastlog.model.message.ByteData;
 import com.zmh.fastlog.worker.AbstractWorker;
 import com.zmh.fastlog.worker.mq.MqWorker;
-import org.apache.commons.lang3.time.StopWatch;
 
 import static com.zmh.fastlog.utils.ThreadUtils.namedDaemonThreadFactory;
 import static java.util.Objects.nonNull;
@@ -59,25 +58,11 @@ public class FileWorker extends AbstractWorker<ByteData, EventSlot>
     @Override
     public void onTimeout(long sequence) {
         ByteData message;
-        int count = 0;
-
-        StopWatch stopWatch = new StopWatch();
-        stopWatch.start();
-
-        long before = ringBuffer.getCursor() - sequence;
         while (ringBuffer.getCursor() - sequence <= HIGH_WATER_LEVEL_FILE && nonNull(message = fifo.get())) {
             if (isClose || !mqWorker.enqueue(message)) {
                 return;
             }
             fifo.next();
-            count++;
-        }
-        stopWatch.stop();
-
-        long time = stopWatch.getTime();
-        long length = ringBuffer.getCursor() - sequence;
-        if (time > 0 || length > HIGH_WATER_LEVEL_FILE * 1.8) {
-            System.out.println("file length " + length + " before" + before + " count:" + count + " time:" + time);
         }
     }
 

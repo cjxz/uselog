@@ -51,22 +51,22 @@ public class DemoController {
             text[i] = getText(100 + i);
         }
 
-        CountDownLatch taskLatch = new CountDownLatch(400_0000);
-        for (int i = 0; i < 4; i++) {
-            threadFactory.newThread(() -> {
-                for (int j = 0; j < 100_0000; j++) {
-                    int index = j % 100;
-                    log.info(text[index]);
-                    taskLatch.countDown();
-                }
-            }).start();
-        }
+        CountDownLatch taskLatch = new CountDownLatch(100_0000);
+
+        threadFactory.newThread(() -> {
+            for (int j = 0; j < 100_0000; j++) {
+                int index = j % 100;
+                log.info(text[index]);
+                taskLatch.countDown();
+            }
+        }).start();
+
         //当前线程阻塞，等待计数器置为0
         taskLatch.await();
 
         stopWatch.stop();
         long time = stopWatch.getTime(TimeUnit.MILLISECONDS);
-        debugLog("耗时：" + time + " " + new BigDecimal(400000).divide(new BigDecimal(time), 2, HALF_UP) + "w/QPS");
+        debugLog("耗时：" + time + " " + new BigDecimal(100000).divide(new BigDecimal(time), 2, HALF_UP) + "w/QPS");
     }
 
     @GetMapping("/testKafka")
