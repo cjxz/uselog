@@ -1,6 +1,7 @@
 package com.zmh.fastlog.worker.file;
 
 import com.zmh.fastlog.model.message.ByteData;
+import com.zmh.fastlog.worker.file.fifo.FIFOFile;
 import io.appulse.utils.Bytes;
 import lombok.Getter;
 import lombok.SneakyThrows;
@@ -22,7 +23,7 @@ public class FIFOQueue implements AutoCloseable {
      */
     private final TwoBytesCacheQueue tail;
 
-    private final LogFilesManager logFiles;
+    private final FIFOFile logFiles;
 
     /**
      * 队列头 是 读缓冲区
@@ -34,20 +35,15 @@ public class FIFOQueue implements AutoCloseable {
     private final BytesCacheQueueFlush head;
 
     @SneakyThrows
-    FIFOQueue(String folder, int cacheSize, int fileMaxCacheCount, int maxFileCount) {
+    public FIFOQueue(String folder, int cacheSize, int fileMaxCacheCount, int maxFileCount) { //todo zmh
         if (Integer.bitCount(fileMaxCacheCount) != 1) {
             throw new IllegalArgumentException("fileMaxCacheCount must be a power of 2");
         }
 
         int sizeInByte = cacheSize * 1024 * 1024;
+        long capacity = (long) sizeInByte * (long) fileMaxCacheCount;
 
-        logFiles = LogFilesManager.builder()
-            .folder(folder)
-            .cacheSize(sizeInByte)
-            .maxIndex(fileMaxCacheCount)
-            .maxFileNum(maxFileCount)
-            .build();
-
+        logFiles = new FIFOFile(folder, sizeInByte, capacity, maxFileCount);
         tail = new TwoBytesCacheQueue(sizeInByte);
         head = new BytesCacheQueueFlush(sizeInByte);
     }
@@ -77,8 +73,9 @@ public class FIFOQueue implements AutoCloseable {
     }
 
     public void next() {
+        current = null;
+
         if (head.inFlush()) {
-            current = null;
             return;
         }
 
@@ -90,7 +87,8 @@ public class FIFOQueue implements AutoCloseable {
         if (!logFiles.isEmpty()) {
             Future<?> future = logFiles.pollTo(head.getQueue().getBytes());
             head.flush(future);
-            current = null;
+            return;
+        } else if (tail.inFlush()) {
             return;
         }
 
@@ -166,6 +164,10 @@ class TwoBytesCacheQueue {
         return this.used.getQueue().isEmpty();
     }
 
+    public boolean inFlush() {
+        return this.other.inFlush();
+    }
+
     public void copyTo(BytesCacheQueue queue) {
         this.used.getQueue().copyTo(queue);
     }
@@ -235,7 +237,7 @@ class BytesCacheQueue {
         int readCount = this.bytes.readInt();
         if (readCount > 0) {
             if (readCount + bytes.readerIndex() > bytes.writerIndex()) {
-                debugLog("fastlog BytesCacheQueue readCount error " + readCount);
+                //debugLog("fastlog BytesCacheQueue readCount error " + readCount + " read" + bytes.readerIndex() + " write" + bytes.writerIndex());
                 return null;
             }
 
@@ -247,7 +249,7 @@ class BytesCacheQueue {
 
             return new ByteData(id, readBuffer, readCount);
         } else {
-            debugLog("fastlog BytesCacheQueue readCount error " + readCount);
+            //debugLog("fastlog BytesCacheQueue readCount error " + readCount + " read" + bytes.readerIndex() + " write" + bytes.writerIndex());
             this.bytes.reset();
             return null;
         }

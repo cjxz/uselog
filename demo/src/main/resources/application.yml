@@ -10,3 +10,5 @@ fastlog:
   mqType: kafka
   partition: 4
   async: true
+  fileMemoryCacheSize: 8
+  fileMaxCacheCount: 64

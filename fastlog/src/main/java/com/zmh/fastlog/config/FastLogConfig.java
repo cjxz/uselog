@@ -85,9 +85,9 @@ public class FastLogConfig {
             int partitionSize = batchMessageSize * Math.min(maxMsgSize, 512); //512是根据经验预估的一条日志的平均大小
 
             if (partitionSize * kafkaPartition < messageBufferSize) {
-                return partitionSize;
+                return Math.min(partitionSize, 100_0000);
             }
-            return messageBufferSize / kafkaPartition;
+            return Math.min(messageBufferSize / kafkaPartition, 100_0000);
         } else {
             return batchMessageSize;
         }

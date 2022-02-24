@@ -1,7 +1,9 @@
 package com.zmh.demo.controller;
 
 import com.google.common.util.concurrent.RateLimiter;
+import com.zmh.fastlog.model.message.ByteData;
 import com.zmh.fastlog.utils.ThreadUtils;
+import com.zmh.fastlog.worker.file.FIFOQueue;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.time.DateFormatUtils;
@@ -26,6 +28,7 @@ import static com.zmh.fastlog.utils.Utils.debugLog;
 import static com.zmh.fastlog.utils.Utils.getNowTime;
 import static java.math.RoundingMode.HALF_UP;
 import static java.util.Objects.nonNull;
+import static java.util.concurrent.TimeUnit.SECONDS;
 
 @RestController
 @Slf4j
@@ -46,16 +49,16 @@ public class DemoController {
         debugLog("end:" + getNowTime());
     }
 
-    @GetMapping("/testLog/{threadCount}/{seconds}/{qps}")
+    @GetMapping("/testLog/{diverse}/{threadCount}/{seconds}/{qps}")
     @SneakyThrows
-    public void testLog(@PathVariable("threadCount") int threadCount, @PathVariable("seconds") int seconds, @PathVariable("qps") int qps) {
-        debugLog("begin:" + getNowTime());
+    public void testLog(@PathVariable("diverse") int diverse, @PathVariable("threadCount") int threadCount, @PathVariable("seconds") int seconds, @PathVariable("qps") int qps) {
+        debugLog("===========================================begin:" + getNowTime());
 
         StopWatch stopWatch = new StopWatch();
         stopWatch.start();
 
-        String[] text = new String[100];
-        for (int i = 0; i < 100; i++) {
+        String[] text = new String[diverse];
+        for (int i = 0; i < diverse; i++) {
             text[i] = getText(100 + i);
         }
 
@@ -68,7 +71,7 @@ public class DemoController {
                 for (int j = 0; j < count; j++) {
                     limiter.acquire();
                     for (int k = 0; k < qps / permits; k++) {
-                        int index = j % 100;
+                        int index = j % diverse;
                         log.info(text[index]);
                         taskLatch.countDown();
                     }
@@ -81,14 +84,33 @@ public class DemoController {
 
         stopWatch.stop();
         long time = stopWatch.getTime(TimeUnit.MILLISECONDS);
-        debugLog("耗时：" + time + " " + new BigDecimal( total / 10).divide(new BigDecimal(time), 2, HALF_UP) + "w/QPS");
+        debugLog("===========================================耗时：" + time + " " + new BigDecimal( total / 10).divide(new BigDecimal(time), 2, HALF_UP) + "w/QPS");
 
-        debugLog("end:" + getNowTime());
+        debugLog("===========================================end:" + getNowTime());
     }
 
-    @GetMapping("test1")
-    public void test1() {
-        log.info("ThreadLocalContext cacheGet getOilType:95 success, OilType(id=95, oilCode=95, oilName=95#, categoryName=优惠加油, displayName=优惠加油 95#, prodId=XU-PTCJ-ERET|1, typeSort=2, createTime=Tue Jul 21 09:40:30 GMT+08:00 2020, updateTime=Thu Oct 29 10:24:21 GMT+08:00 2020, createUser=0, updateUser=0, isDelete=0)");
+    @GetMapping("/disk/{size}/{total}")
+    @SneakyThrows
+    public void testDisk(@PathVariable("size") int size, @PathVariable("total") int total) {
+        try (FIFOQueue fifo = new FIFOQueue("logs/cache", size, 8, 100)) {
+            long seq = 1L;
+
+            byte[] bytes = getText(300).getBytes();
+            ByteData byteEvent = new ByteData(0, bytes, bytes.length);
+
+            StopWatch watch = new StopWatch();
+            watch.start();
+            for (int i = 0; i < total; i++) {
+                for (int j = 0; j < 10000; j++) {
+                    byteEvent.setId(seq++);
+                    fifo.put(byteEvent);
+                }
+            }
+            watch.stop();
+            debugLog("一共创建了" + fifo.getTotalFile() + "个文件，还剩余" + fifo.getFileNum() + "个文件");
+            debugLog(watch.formatTime());
+            debugLog(total / watch.getTime(SECONDS) + "w/QPS");
+        }
     }
 
     @GetMapping("/testKafka")

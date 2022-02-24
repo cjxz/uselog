@@ -51,7 +51,7 @@ public class LogFilesManager implements Closeable {
 
     private int maxFileNum;
 
-    private final ExecutorService writeSingleThreadExecutor = Executors.newSingleThreadExecutor();
+    private final ExecutorService singleThreadExecutor = Executors.newSingleThreadExecutor();
     private final ExecutorService readSingleThreadExecutor = Executors.newSingleThreadExecutor();
 
     @Builder
@@ -137,7 +137,7 @@ public class LogFilesManager implements Closeable {
 
     @SneakyThrows
     public Future<?> write(@NonNull Bytes bytes) {
-        return writeSingleThreadExecutor.submit(() -> {
+        return singleThreadExecutor.submit(() -> {
             if (writeFile.write(bytes)) {
                 return;
             }
@@ -177,7 +177,7 @@ public class LogFilesManager implements Closeable {
         safeClose(writeFile);
         safeClose(readFile);
         safeClose(indexFile);
-        writeSingleThreadExecutor.shutdown();
+        singleThreadExecutor.shutdown();
         readSingleThreadExecutor.shutdown();
     }
 }
@@ -259,7 +259,6 @@ class LogFile implements Closeable {
         byteBuffer.limit(len);
         int read = channel.read(byteBuffer, position + 4);
         bytes.writerIndex(len);
-        debugLog("pollTo writeFile read" + read + ",len" + len);
 
         readIndex++;
         indexFile.readIndex(fileIndex, readIndex);

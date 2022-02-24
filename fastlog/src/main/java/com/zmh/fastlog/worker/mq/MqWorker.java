@@ -31,6 +31,8 @@ public class MqWorker extends AbstractWorker<ByteData, EventSlot>
     private volatile boolean isDisposed = false;
 
     private final int batchSize;
+    LogMissingCountAndPrint mqCount = new LogMissingCountAndPrint("mq");
+
 
     public MqWorker(MqProducer mqProducer, int batchSize) {
         this.mqProducer = mqProducer;
@@ -85,6 +87,7 @@ public class MqWorker extends AbstractWorker<ByteData, EventSlot>
         }
 
         mqProducer.sendEvent(event);
+        mqCount.increment();
 
         if (++batchIndex >= batchSize || endOfBatch) {
             mqProducer.flush();
@@ -143,5 +146,6 @@ public class MqWorker extends AbstractWorker<ByteData, EventSlot>
             queue.halt();
         }
         mqProducer.close();
+        mqCount.close();
     }
 }
