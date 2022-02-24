@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration debug="false">
 
+    <springProperty scope="context" name="fastlogUrl" source="fastlog.url" defaultValue="localhost:9092"/>
+    <springProperty scope="context" name="fastlogTopic" source="fastlog.topic" defaultValue="localhost:9092"/>
+    <springProperty scope="context" name="fastlogAsync" source="fastlog.async" defaultValue="localhost:9092"/>
 
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <filter class="com.zmh.demo.filter.StdoutFilter" />
@@ -12,21 +15,28 @@
 
     <appender name="GITHUB" class="com.github.danielwegener.logback.kafka.KafkaAppender">
 
-        <!-- -->
-        <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder"/>
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{5} - %msg%n</pattern>
+        </encoder>
 
-        <topic>${topic}</topic>
+        <topic>${fastlogTopic}</topic>
         <keyingStrategy
                 class="com.github.danielwegener.logback.kafka.keying.NoKeyKeyingStrategy" />
         <deliveryStrategy
                 class="com.github.danielwegener.logback.kafka.delivery.AsynchronousDeliveryStrategy" />
         <!-- 请勿后移该项配置 -->
-        <producerConfig>bootstrap.servers=${url}</producerConfig>
-        <producerConfig>max.block.ms=200</producerConfig>
+        <producerConfig>bootstrap.servers=${fastlogUrl}</producerConfig>
+        <producerConfig>max.block.ms=0</producerConfig>
         <producerConfig>compression.type=lz4</producerConfig>
-        <producerConfig>batch.size=2097152</producerConfig>
+        <producerConfig>batch.size=1048576</producerConfig>
     </appender>
 
+    <appender name="ASYNC_GITHUB" class="ch.qos.logback.classic.AsyncAppender">
+        <discardingThreshold>0</discardingThreshold>
+        <queueSize>32768</queueSize>
+        <neverBlock>true</neverBlock>
+        <appender-ref ref="GITHUB"/>
+    </appender>
 
     <include resource="fastlog-base.xml" />
 
@@ -38,10 +48,21 @@
             </root>
         </then>
         <else>
-            <root level="INFO">
-                <appender-ref ref="GITHUB"/>
-                <appender-ref ref="STDOUT"/>
-            </root>
+            <if condition='property("fastlogAsync").contains("true")'>
+                <then>
+                    <root level="INFO">
+                        <appender-ref ref="ASYNC_GITHUB"/>
+                        <appender-ref ref="STDOUT"/>
+                    </root>
+                </then>
+                <else>
+                    <root level="INFO">
+                        <appender-ref ref="GITHUB"/>
+                        <appender-ref ref="STDOUT"/>
+                    </root>
+                </else>
+            </if>
+
         </else>
     </if>
 

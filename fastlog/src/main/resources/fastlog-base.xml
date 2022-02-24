@@ -8,7 +8,7 @@
     <springProperty scope="context" name="batchMessageSize" source="fastlog.batchMessageSize" defaultValue="1024"/>
     <springProperty scope="context" name="kafkaPartition" source="fastlog.kafkaPartition" defaultValue="4"/>
     <springProperty scope="context" name="fileCacheFolder" source="fastlog.fileCacheFolder" defaultValue="logs/cache"/>
-    <springProperty scope="context" name="fileMemoryCacheSize" source="fastlog.fileMemoryCacheSize" defaultValue="67108864"/>
+    <springProperty scope="context" name="fileMemoryCacheSize" source="fastlog.fileMemoryCacheSize" defaultValue="64"/>
     <springProperty scope="context" name="maxFileCount" source="fastlog.maxFileCount" defaultValue="20"/>
     <springProperty scope="context" name="maxMsgSize" source="fastlog.maxMsgSize" defaultValue="10240"/>
     <springProperty scope="context" name="fileMaxCacheCount" source="fastlog.fileMaxCacheCount" defaultValue="16"/>

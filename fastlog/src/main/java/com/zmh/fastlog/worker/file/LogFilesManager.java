@@ -20,6 +20,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import static com.zmh.fastlog.utils.Utils.debugLog;
 import static com.zmh.fastlog.utils.Utils.safeClose;
 import static com.zmh.fastlog.worker.file.LogFileFactory.*;
 import static java.nio.file.StandardOpenOption.READ;
@@ -50,7 +51,8 @@ public class LogFilesManager implements Closeable {
 
     private int maxFileNum;
 
-    private final ExecutorService singleThreadExecutor = Executors.newSingleThreadExecutor();
+    private final ExecutorService writeSingleThreadExecutor = Executors.newSingleThreadExecutor();
+    private final ExecutorService readSingleThreadExecutor = Executors.newSingleThreadExecutor();
 
     @Builder
     @SneakyThrows
@@ -77,6 +79,7 @@ public class LogFilesManager implements Closeable {
 
     private void initWriteReadFile() {
         int fileSize = filesManager.getFileNum();
+        debugLog("initWriteReadFile exist fileSize: " + fileSize);
         if (fileSize > 0) {
             int readIndex = indexFile.readIndex(WRITE_FILE_INDEX);
             int writeIndex = indexFile.writeIndex(WRITE_FILE_INDEX);
@@ -103,11 +106,15 @@ public class LogFilesManager implements Closeable {
             Path path = filesManager.createNextFile();
             writeFile = createWriteFile(path, indexFile, maxIndex, cacheSize);
         }
+
+        System.out.println(indexFile.writeIndex(0) + "," + indexFile.readIndex(0) + "," +
+            indexFile.writeIndex(1) + "," + indexFile.writeIndex(1)
+        );
     }
 
     @SneakyThrows
     public Future<?> pollTo(@NonNull Bytes bytes) {
-        return singleThreadExecutor.submit(() -> pollToBytes(bytes));
+        return readSingleThreadExecutor.submit(() -> pollToBytes(bytes));
     }
 
     private void pollToBytes(Bytes bytes) {
@@ -130,7 +137,7 @@ public class LogFilesManager implements Closeable {
 
     @SneakyThrows
     public Future<?> write(@NonNull Bytes bytes) {
-        return singleThreadExecutor.submit(() -> {
+        return writeSingleThreadExecutor.submit(() -> {
             if (writeFile.write(bytes)) {
                 return;
             }
@@ -170,7 +177,8 @@ public class LogFilesManager implements Closeable {
         safeClose(writeFile);
         safeClose(readFile);
         safeClose(indexFile);
-        singleThreadExecutor.shutdown();
+        writeSingleThreadExecutor.shutdown();
+        readSingleThreadExecutor.shutdown();
     }
 }
 
@@ -249,9 +257,9 @@ class LogFile implements Closeable {
         val byteBuffer = ByteBuffer.wrap(bytes.array());
         byteBuffer.position(0);
         byteBuffer.limit(len);
-        channel.read(byteBuffer, position + 4);
-
+        int read = channel.read(byteBuffer, position + 4);
         bytes.writerIndex(len);
+        debugLog("pollTo writeFile read" + read + ",len" + len);
 
         readIndex++;
         indexFile.readIndex(fileIndex, readIndex);
@@ -266,6 +274,9 @@ class LogFile implements Closeable {
 
         int position = (writeIndex & (maxIndex - 1)) * cacheSize;
 
+        //bug fix 这里需要先加1，避免后续认为这里是空的
+        writeIndex++;
+
         lenBuffer.clear();
         lenBuffer.putInt(bytes.readableBytes());
         lenBuffer.rewind();
@@ -276,7 +287,6 @@ class LogFile implements Closeable {
         byteBuffer.limit(bytes.readableBytes());
         channel.write(byteBuffer, position + 4);
 
-        writeIndex++;
         indexFile.writeIndex(fileIndex, writeIndex);
         return true;
     }

@@ -1,5 +1,6 @@
 package com.zmh.demo.controller;
 
+import com.google.common.util.concurrent.RateLimiter;
 import com.zmh.fastlog.utils.ThreadUtils;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -9,6 +10,7 @@ import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
@@ -31,6 +33,10 @@ public class DemoController {
 
     private final static ThreadFactory threadFactory = ThreadUtils.namedDaemonThreadFactory("DemoController");
 
+    private final static int permits = 1_0000;
+
+    private final static RateLimiter limiter = RateLimiter.create(permits);
+
     @GetMapping("test")
     public void test() {
         debugLog("begin:" + getNowTime());
@@ -40,9 +46,11 @@ public class DemoController {
         debugLog("end:" + getNowTime());
     }
 
-    @GetMapping("testLog")
+    @GetMapping("/testLog/{threadCount}/{seconds}/{qps}")
     @SneakyThrows
-    public void testLog() {
+    public void testLog(@PathVariable("threadCount") int threadCount, @PathVariable("seconds") int seconds, @PathVariable("qps") int qps) {
+        debugLog("begin:" + getNowTime());
+
         StopWatch stopWatch = new StopWatch();
         stopWatch.start();
 
@@ -51,22 +59,36 @@ public class DemoController {
             text[i] = getText(100 + i);
         }
 
-        CountDownLatch taskLatch = new CountDownLatch(100_0000);
+        int total = seconds * qps;
+        int count = seconds * permits / threadCount;
 
-        threadFactory.newThread(() -> {
-            for (int j = 0; j < 100_0000; j++) {
-                int index = j % 100;
-                log.info(text[index]);
-                taskLatch.countDown();
-            }
-        }).start();
+        CountDownLatch taskLatch = new CountDownLatch(total - qps);
+        for (int i = 0; i < threadCount; i++) {
+            threadFactory.newThread(() -> {
+                for (int j = 0; j < count; j++) {
+                    limiter.acquire();
+                    for (int k = 0; k < qps / permits; k++) {
+                        int index = j % 100;
+                        log.info(text[index]);
+                        taskLatch.countDown();
+                    }
+                }
+            }).start();
+        }
 
         //当前线程阻塞，等待计数器置为0
         taskLatch.await();
 
         stopWatch.stop();
         long time = stopWatch.getTime(TimeUnit.MILLISECONDS);
-        debugLog("耗时：" + time + " " + new BigDecimal(100000).divide(new BigDecimal(time), 2, HALF_UP) + "w/QPS");
+        debugLog("耗时：" + time + " " + new BigDecimal( total / 10).divide(new BigDecimal(time), 2, HALF_UP) + "w/QPS");
+
+        debugLog("end:" + getNowTime());
+    }
+
+    @GetMapping("test1")
+    public void test1() {
+        log.info("ThreadLocalContext cacheGet getOilType:95 success, OilType(id=95, oilCode=95, oilName=95#, categoryName=优惠加油, displayName=优惠加油 95#, prodId=XU-PTCJ-ERET|1, typeSort=2, createTime=Tue Jul 21 09:40:30 GMT+08:00 2020, updateTime=Thu Oct 29 10:24:21 GMT+08:00 2020, createUser=0, updateUser=0, isDelete=0)");
     }
 
     @GetMapping("/testKafka")

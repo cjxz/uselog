@@ -2,10 +2,11 @@ server:
   port: 8090
 fastlog:
   enable: true
-  url: 172.24.245.233:9092
+  url: 10.106.112.30:9092
   topic: log4
   #url: pulsar://localhost:6650
   #topic: persistent://log/test1/test-topic
-  batchMessageSize: 4096
+  batchMessageSize: 2048
   mqType: kafka
   partition: 4
+  async: true

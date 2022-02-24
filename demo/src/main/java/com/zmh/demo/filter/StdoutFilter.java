@@ -10,6 +10,7 @@ public class StdoutFilter extends Filter<ILoggingEvent> {
 
     @Override
     public FilterReply decide(ILoggingEvent event) {
-        return event.getLoggerName().startsWith("com.zmh.demo.controller") ?  FilterReply.DENY : FilterReply.NEUTRAL;
+        String loggerName = event.getLoggerName();
+        return loggerName.startsWith("com.zmh.demo.controller") ?  FilterReply.DENY : FilterReply.NEUTRAL;
     }
 }

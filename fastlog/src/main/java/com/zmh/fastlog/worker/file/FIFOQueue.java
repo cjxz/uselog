@@ -39,15 +39,17 @@ public class FIFOQueue implements AutoCloseable {
             throw new IllegalArgumentException("fileMaxCacheCount must be a power of 2");
         }
 
+        int sizeInByte = cacheSize * 1024 * 1024;
+
         logFiles = LogFilesManager.builder()
             .folder(folder)
-            .cacheSize(cacheSize)
+            .cacheSize(sizeInByte)
             .maxIndex(fileMaxCacheCount)
             .maxFileNum(maxFileCount)
             .build();
 
-        tail = new TwoBytesCacheQueue(cacheSize);
-        head = new BytesCacheQueueFlush(cacheSize);
+        tail = new TwoBytesCacheQueue(sizeInByte);
+        head = new BytesCacheQueueFlush(sizeInByte);
     }
 
     public void put(ByteData byteData) {
@@ -232,6 +234,11 @@ class BytesCacheQueue {
         }
         int readCount = this.bytes.readInt();
         if (readCount > 0) {
+            if (readCount + bytes.readerIndex() > bytes.writerIndex()) {
+                debugLog("fastlog BytesCacheQueue readCount error " + readCount);
+                return null;
+            }
+
             if (readCount > readBuffer.length) {
                 readBuffer = new byte[marginToBuffer(readCount)];
             }

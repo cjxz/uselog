@@ -28,7 +28,7 @@ public class LogMissingCountAndPrint implements Closeable {
         long sum = logMissingCount.sumThenReset();
         if (sum > 0) {
             totalMissingCount += sum;
-            debugLog(name + " log mission count:" + sum + ", total:" + totalMissingCount);
+            debugLog(name + " mission count:" + sum + ", total:" + totalMissingCount);
         }
     }
 
