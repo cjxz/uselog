@@ -65,7 +65,7 @@ public class DemoController {
         int total = seconds * qps;
         int count = seconds * permits / threadCount;
 
-        CountDownLatch taskLatch = new CountDownLatch(total - qps);
+        CountDownLatch taskLatch = new CountDownLatch(total - 1000);
         for (int i = 0; i < threadCount; i++) {
             threadFactory.newThread(() -> {
                 for (int j = 0; j < count; j++) {

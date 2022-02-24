@@ -3,13 +3,9 @@ package com.zmh.fastlog.worker.file.fifo;
 import io.appulse.utils.Bytes;
 import lombok.NonNull;
 import lombok.SneakyThrows;
-import net.jpountz.lz4.LZ4Compressor;
-import net.jpountz.lz4.LZ4Factory;
-import net.jpountz.lz4.LZ4SafeDecompressor;
 import org.apache.pulsar.shade.io.airlift.compress.Compressor;
 import org.apache.pulsar.shade.io.airlift.compress.lz4.Lz4Compressor;
 import org.apache.pulsar.shade.io.airlift.compress.lz4.Lz4Decompressor;
-
 
 import java.io.Closeable;
 import java.nio.ByteBuffer;
@@ -20,7 +16,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
-import static com.zmh.fastlog.utils.Utils.debugLog;
+import static com.zmh.fastlog.utils.Utils.debugLogCondition;
 import static com.zmh.fastlog.utils.Utils.safeClose;
 import static com.zmh.fastlog.worker.file.fifo.ReadWriteFileFactory.createReadFile;
 import static com.zmh.fastlog.worker.file.fifo.ReadWriteFileFactory.createWriteFile;
@@ -108,7 +104,7 @@ public class FIFOFile implements Closeable {
             try {
                 //先压缩
                 int compress = compressor.compress(bytes.array(), 0, bytes.readableBytes(), compressorBuffer, 0, compressorBuffer.length);
-                debugLog("compress, before" + bytes.readableBytes() + ",after" + compress);
+                debugLogCondition("compress, before" + bytes.readableBytes() + ",after" + compress);
 
                 ByteBuffer buffer = ByteBuffer.wrap(compressorBuffer);
                 buffer.position(0);
@@ -146,7 +142,7 @@ public class FIFOFile implements Closeable {
                 if (pollTo(buffer)) {
                     int decompress = decompressor.decompress(buffer.array(), 0, buffer.limit(), bytes.array(), 0, bytes.array().length);
 
-                    debugLog("decompress, before" + buffer.limit() + ",after" + decompress);
+                    debugLogCondition("decompress, before" + buffer.limit() + ",after" + decompress);
 
                     bytes.readerIndex(0);
                     bytes.writerIndex(decompress);

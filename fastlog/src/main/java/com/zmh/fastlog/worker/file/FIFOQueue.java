@@ -9,8 +9,7 @@ import org.apache.commons.lang3.time.StopWatch;
 
 import java.util.concurrent.Future;
 
-import static com.zmh.fastlog.utils.Utils.debugLog;
-import static com.zmh.fastlog.utils.Utils.marginToBuffer;
+import static com.zmh.fastlog.utils.Utils.*;
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 
@@ -203,7 +202,7 @@ class BytesCacheQueueFlush {
         stopWatch.start();
         future.get();
         stopWatch.stop();
-        debugLog("wait future:" + stopWatch.formatTime());
+        debugLogCondition("wait future:" + stopWatch.formatTime());
     }
 }
 

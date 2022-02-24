@@ -4,9 +4,20 @@ import org.apache.commons.lang3.time.DateFormatUtils;
 
 import java.util.Date;
 
+import static java.lang.System.currentTimeMillis;
 import static java.util.Objects.nonNull;
 
 public class Utils {
+
+    private static long lastTime = 0;
+
+    public static void debugLogCondition(String str) {
+        long current = currentTimeMillis();
+        if (current - 5000 > lastTime) {
+            System.out.println(str);
+            lastTime = current;
+        }
+    }
 
     public static void debugLog(String message) {
         System.out.println(message);
