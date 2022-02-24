@@ -54,18 +54,18 @@ public class DemoController {
     public void testLog(@PathVariable("diverse") int diverse, @PathVariable("threadCount") int threadCount, @PathVariable("seconds") int seconds, @PathVariable("qps") int qps) {
         debugLog("===========================================begin:" + getNowTime());
 
-        StopWatch stopWatch = new StopWatch();
-        stopWatch.start();
-
         String[] text = new String[diverse];
         for (int i = 0; i < diverse; i++) {
             text[i] = getText(100 + i);
         }
 
+        StopWatch stopWatch = new StopWatch();
+        stopWatch.start();
+
         int total = seconds * qps;
         int count = seconds * permits / threadCount;
 
-        CountDownLatch taskLatch = new CountDownLatch(total - 1000);
+        CountDownLatch taskLatch = new CountDownLatch(count);
         for (int i = 0; i < threadCount; i++) {
             threadFactory.newThread(() -> {
                 for (int j = 0; j < count; j++) {
@@ -73,8 +73,8 @@ public class DemoController {
                     for (int k = 0; k < qps / permits; k++) {
                         int index = j % diverse;
                         log.info(text[index]);
-                        taskLatch.countDown();
                     }
+                    taskLatch.countDown();
                 }
             }).start();
         }
