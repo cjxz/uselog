@@ -6,6 +6,7 @@ import com.lmax.disruptor.dsl.ProducerType;
 import com.zmh.fastlog.model.event.EventSlot;
 import com.zmh.fastlog.model.message.ByteData;
 import com.zmh.fastlog.worker.AbstractWorker;
+import com.zmh.fastlog.worker.file.rock.FIFOFile;
 import com.zmh.fastlog.worker.mq.MqWorker;
 
 import static com.zmh.fastlog.utils.ThreadUtils.namedDaemonThreadFactory;
@@ -18,13 +19,13 @@ public class FileWorker extends AbstractWorker<ByteData, EventSlot>
     private final MqWorker mqWorker;
     private final Disruptor<EventSlot> queue;
     private final RingBuffer<EventSlot> ringBuffer;
-    private final FIFOQueue fifo;
+    private final FIFOFile fifo;
     private final int HIGH_WATER_LEVEL_FILE;
 
     private volatile boolean isClose;
 
     public FileWorker(MqWorker mqWorker, int batchSize, int cacheSize, int fileMaxCacheCount, int maxFileCount, String folder) {
-        fifo = new FIFOQueue(folder, cacheSize, fileMaxCacheCount, maxFileCount);
+        fifo = new FIFOFile();
 
         this.mqWorker = mqWorker;
         this.HIGH_WATER_LEVEL_FILE = batchSize;
@@ -47,7 +48,8 @@ public class FileWorker extends AbstractWorker<ByteData, EventSlot>
 
     @Override
     public void dequeue(EventSlot event, long sequence, boolean endOfBatch) {
-        fifo.put(event.getByteData());
+        ByteData byteData = event.getByteData();
+        fifo.addItem(byteData.getId(), byteData.getData(), byteData.getDataLength());
         event.clear();
 
         if (notifySeq(sequence) || endOfBatch) {

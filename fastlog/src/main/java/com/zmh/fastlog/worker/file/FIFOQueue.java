@@ -1,7 +1,6 @@
 package com.zmh.fastlog.worker.file;
 
 import com.zmh.fastlog.model.message.ByteData;
-import com.zmh.fastlog.worker.file.fifo.FIFOFile;
 import io.appulse.utils.Bytes;
 import lombok.Getter;
 import lombok.SneakyThrows;
@@ -9,7 +8,8 @@ import org.apache.commons.lang3.time.StopWatch;
 
 import java.util.concurrent.Future;
 
-import static com.zmh.fastlog.utils.Utils.*;
+import static com.zmh.fastlog.utils.BufferUtils.marginToBuffer;
+import static com.zmh.fastlog.utils.Utils.debugLogCondition;
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 
@@ -22,7 +22,9 @@ public class FIFOQueue implements AutoCloseable {
      */
     private final TwoBytesCacheQueue tail;
 
-    private final FIFOFile logFiles;
+    //private final FIFOFile logFiles;
+
+    private final LogFilesManager logFiles;
 
     /**
      * 队列头 是 读缓冲区
@@ -40,9 +42,16 @@ public class FIFOQueue implements AutoCloseable {
         }
 
         int sizeInByte = cacheSize * 1024 * 1024;
-        long capacity = (long) sizeInByte * (long) fileMaxCacheCount;
+        //long capacity = (long) sizeInByte * (long) fileMaxCacheCount;
+        //logFiles = new FIFOFile(folder, sizeInByte, capacity, maxFileCount);
 
-        logFiles = new FIFOFile(folder, sizeInByte, capacity, maxFileCount);
+        logFiles = LogFilesManager.builder()
+            .cacheSize(sizeInByte)
+            .folder(folder)
+            .maxFileNum(maxFileCount)
+            .maxIndex(fileMaxCacheCount)
+            .build();
+
         tail = new TwoBytesCacheQueue(sizeInByte);
         head = new BytesCacheQueueFlush(sizeInByte);
     }

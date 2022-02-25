@@ -7,7 +7,7 @@ import java.nio.ByteBuffer;
 import java.nio.CharBuffer;
 import java.nio.charset.CharsetEncoder;
 
-import static com.zmh.fastlog.utils.Utils.marginToBuffer;
+import static com.zmh.fastlog.utils.BufferUtils.marginToBuffer;
 import static java.lang.System.arraycopy;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Objects.isNull;

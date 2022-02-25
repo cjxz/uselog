@@ -141,7 +141,6 @@ public class FIFOFile implements Closeable {
 
                 if (pollTo(buffer)) {
                     int decompress = decompressor.decompress(buffer.array(), 0, buffer.limit(), bytes.array(), 0, bytes.array().length);
-
                     debugLogCondition("decompress, before" + buffer.limit() + ",after" + decompress);
 
                     bytes.readerIndex(0);

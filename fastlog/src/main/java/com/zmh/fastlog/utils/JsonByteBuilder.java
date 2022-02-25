@@ -4,7 +4,7 @@ import lombok.NonNull;
 
 import java.util.Calendar;
 
-import static com.zmh.fastlog.utils.Utils.marginToBuffer;
+import static com.zmh.fastlog.utils.BufferUtils.marginToBuffer;
 import static java.util.Objects.isNull;
 
 public class JsonByteBuilder {

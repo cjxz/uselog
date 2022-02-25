@@ -50,12 +50,4 @@ public class Utils {
         return DateFormatUtils.format(new Date(), "yyyy-MM-dd HH:mm:ss SSS");
     }
 
-    public static int marginToBuffer(int len) {
-        if ((len & 63) != 0) {
-            len &= ~63;
-            len += 64;
-        }
-        return len;
-    }
-
 }
