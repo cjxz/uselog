@@ -1,11 +1,13 @@
 package com.zmh.fastlog;
 
 import io.appulse.utils.Bytes;
+import lombok.SneakyThrows;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.pulsar.shade.io.airlift.compress.lz4.Lz4Compressor;
 import org.junit.Test;
 
 import java.nio.ByteBuffer;
-import java.util.Calendar;
+import java.util.*;
 
 import static com.zmh.fastlog.utils.Utils.debugLogCondition;
 import static com.zmh.fastlog.worker.file.fifo.ReadWriteFileFactory.createReadFile;
@@ -32,25 +34,55 @@ public class TestDate {
         System.out.println(String.format("%d,%d,%d,%d,%d,%d", year, month, day, hour, minute, seconds));
     }
 
-    /*@Test
+    @Test
     public void test1() {
-        Bytes bytes = Bytes.allocate(2000);
+        System.out.println(getText1(300));
+        System.out.println(getText1(300));
+        System.out.println(getText1(300));
+        System.out.println(getText1(300));
 
-        Lz4Compressor compressor = new Lz4Compressor();
+    }
 
-        int compress = compressor.compress(bytes.array(), 0, bytes.readableBytes(), compressorBuffer, 0, compressorBuffer.length);
-        debugLogCondition("compress, before" + bytes.readableBytes() + ",after" + compress);
+    private String getText1(int size) {
+        List<String> stringList = getText(size);
+        Collections.shuffle(stringList);
 
-        ByteBuffer buffer = ByteBuffer.wrap(compressorBuffer);
-        buffer.position(0);
-        buffer.limit(compress);
-
-        if (writeFile.write(buffer)) {
-            return;
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < stringList.size(); i++) {
+            sb.append(stringList.get(i));
         }
-        if (filesManager.getFileNum() == 1) {
-            readFile = createReadFile(writeFile.getPath(), indexFile, writeFile.getReadIndex(), writeFile.getWriteIndex(), capacity);
+        return sb.toString();
+    }
+
+    private List<String> getText(int size) {
+        List<String> list = new ArrayList<>();
+
+        for (int i = 0; i < 10; i++) {
+            for (int j = 0; j < size / 10 - 10; j++) {
+                list.add(RandomStringUtils.randomPrint(1));
+            }
+            for (int j = 0; j < 10; j++) {
+                list.add(getRandomChar());
+            }
         }
-    }*/
+        return list;
+    }
+
+    //随机生成常见汉字
+    @SneakyThrows
+    private String getRandomChar() {
+        int highCode;
+        int lowCode;
+
+        Random random = new Random();
+
+        highCode = (176 + Math.abs(random.nextInt(39))); //B0 + 0~39(16~55) 一级汉字所占区
+        lowCode = (161 + Math.abs(random.nextInt(93))); //A1 + 0~93 每区有94个汉字
+
+        byte[] b = new byte[2];
+        b[0] = (Integer.valueOf(highCode)).byteValue();
+        b[1] = (Integer.valueOf(lowCode)).byteValue();
+        return new String(b, "GBK");
+    }
 }
 

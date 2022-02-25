@@ -6,6 +6,7 @@ import com.zmh.fastlog.utils.ThreadUtils;
 import com.zmh.fastlog.worker.file.FIFOQueue;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.time.DateFormatUtils;
 import org.apache.commons.lang3.time.StopWatch;
 import org.apache.kafka.clients.producer.KafkaProducer;
@@ -16,10 +17,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Random;
+import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
@@ -44,19 +42,19 @@ public class DemoController {
     public void test() {
         debugLog("begin:" + getNowTime());
         for (int i = 10; i > 0; i--) {
-            log.info(getText(i));
+            log.info(getText1(i));
         }
         debugLog("end:" + getNowTime());
     }
 
-    @GetMapping("/testLog/{diverse}/{threadCount}/{seconds}/{qps}")
+    @GetMapping("/testLog/{diverse}/{threadCount}/{seconds}/{qps}/{size}")
     @SneakyThrows
-    public void testLog(@PathVariable("diverse") int diverse, @PathVariable("threadCount") int threadCount, @PathVariable("seconds") int seconds, @PathVariable("qps") int qps) {
+    public void testLog(@PathVariable("size") int size, @PathVariable("diverse") int diverse, @PathVariable("threadCount") int threadCount, @PathVariable("seconds") int seconds, @PathVariable("qps") int qps) {
         debugLog("===========================================begin:" + getNowTime());
 
         String[] text = new String[diverse];
         for (int i = 0; i < diverse; i++) {
-            text[i] = getText(200);
+            text[i] = getText1(size);
         }
 
         StopWatch stopWatch = new StopWatch();
@@ -95,7 +93,7 @@ public class DemoController {
         try (FIFOQueue fifo = new FIFOQueue("logs/cache", size, 8, 100)) {
             long seq = 1L;
 
-            byte[] bytes = getText(300).getBytes();
+            byte[] bytes = getText1(300).getBytes();
             ByteData byteEvent = new ByteData(0, bytes, bytes.length);
 
             StopWatch watch = new StopWatch();
@@ -123,7 +121,7 @@ public class DemoController {
 
         KafkaProducer<String, String> producer = new KafkaProducer<>(configs, new StringSerializer(), new StringSerializer());
 
-        String text = getText(1);
+        String text = getText1(1);
         debugLog("begin:" + DateFormatUtils.format(new Date(), "yyyy-MM-dd HH:mm:ss SSS"));
         for (int i = 0; i < 100_0000; i++) {
             ProducerRecord<String, String> record = new ProducerRecord<>("log2", text + i);
@@ -154,13 +152,30 @@ public class DemoController {
     }
 
 
-    private String getText(int size) {
+
+    private String getText1(int size) {
+        List<String> stringList = getText(size);
+        Collections.shuffle(stringList);
+
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < size; i++) {
-            sb.append(getRandomChar());
+        for (int i = 0; i < stringList.size(); i++) {
+            sb.append(stringList.get(i));
         }
-        sb.append("。");
         return sb.toString();
+    }
+
+    private List<String> getText(int size) {
+        List<String> list = new ArrayList<>();
+
+        for (int i = 0; i < 10; i++) {
+            for (int j = 0; j < size / 10 - 10; j++) {
+                list.add(RandomStringUtils.randomPrint(1));
+            }
+            for (int j = 0; j < 10; j++) {
+                list.add(getRandomChar());
+            }
+        }
+        return list;
     }
 
     //随机生成常见汉字
