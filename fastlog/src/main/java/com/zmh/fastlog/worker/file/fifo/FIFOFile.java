@@ -67,8 +67,8 @@ public class FIFOFile implements Closeable {
 
         initWriteReadFile();
 
-        compressor = new ZstdCompressor();
-        decompressor = new ZstdDecompressor();
+        compressor = new Lz4Compressor();
+        decompressor = new Lz4Decompressor();
         compressorBuffer = new byte[cacheSize + cacheSize / 255 + 20];
     }
 
