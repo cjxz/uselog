@@ -23,9 +23,9 @@ public class FIFOQueue implements AutoCloseable {
      */
     private final TwoBytesCacheQueue tail;
 
-    //private final FIFOFile logFiles;
+    private final FIFOFile logFiles;
 
-    private final LogFilesManager logFiles;
+    //private final LogFilesManager logFiles;
 
     /**
      * 队列头 是 读缓冲区
@@ -43,15 +43,15 @@ public class FIFOQueue implements AutoCloseable {
         }
 
         int sizeInByte = cacheSize * 1024 * 1024;
-        //long capacity = (long) sizeInByte * (long) fileMaxCacheCount;
-        //logFiles = new FIFOFile(folder, sizeInByte, capacity, maxFileCount);
+        long capacity = (long) sizeInByte * (long) fileMaxCacheCount;
+        logFiles = new FIFOFile(folder, sizeInByte, capacity, maxFileCount);
 
-        logFiles = LogFilesManager.builder()
+        /*logFiles = LogFilesManager.builder()
             .cacheSize(sizeInByte)
             .folder(folder)
             .maxFileNum(maxFileCount)
             .maxIndex(fileMaxCacheCount)
-            .build();
+            .build();*/
 
         tail = new TwoBytesCacheQueue(sizeInByte);
         head = new BytesCacheQueueFlush(sizeInByte);
