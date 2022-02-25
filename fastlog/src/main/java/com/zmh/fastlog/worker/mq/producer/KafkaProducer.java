@@ -104,7 +104,7 @@ public class KafkaProducer implements MqProducer {
         if (kafkaMissingCount == 10) { //todo zmh config？？是否有并发？？
             totalMissingCount += 10;
             isReady = false;
-            debugLog("fastlog kafka sendEvent fail, e:" + e.getMessage() + ",totalMissingCount:" + totalMissingCount);
+            //debugLog("fastlog kafka sendEvent fail, e:" + e.getMessage() + ",totalMissingCount:" + totalMissingCount);
         }
     }
 

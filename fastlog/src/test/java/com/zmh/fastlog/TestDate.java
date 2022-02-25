@@ -1,8 +1,14 @@
 package com.zmh.fastlog;
 
+import io.appulse.utils.Bytes;
+import org.apache.pulsar.shade.io.airlift.compress.lz4.Lz4Compressor;
 import org.junit.Test;
 
+import java.nio.ByteBuffer;
 import java.util.Calendar;
+
+import static com.zmh.fastlog.utils.Utils.debugLogCondition;
+import static com.zmh.fastlog.worker.file.fifo.ReadWriteFileFactory.createReadFile;
 
 public class TestDate {
 
@@ -25,5 +31,26 @@ public class TestDate {
 
         System.out.println(String.format("%d,%d,%d,%d,%d,%d", year, month, day, hour, minute, seconds));
     }
+
+    /*@Test
+    public void test1() {
+        Bytes bytes = Bytes.allocate(2000);
+
+        Lz4Compressor compressor = new Lz4Compressor();
+
+        int compress = compressor.compress(bytes.array(), 0, bytes.readableBytes(), compressorBuffer, 0, compressorBuffer.length);
+        debugLogCondition("compress, before" + bytes.readableBytes() + ",after" + compress);
+
+        ByteBuffer buffer = ByteBuffer.wrap(compressorBuffer);
+        buffer.position(0);
+        buffer.limit(compress);
+
+        if (writeFile.write(buffer)) {
+            return;
+        }
+        if (filesManager.getFileNum() == 1) {
+            readFile = createReadFile(writeFile.getPath(), indexFile, writeFile.getReadIndex(), writeFile.getWriteIndex(), capacity);
+        }
+    }*/
 }
 

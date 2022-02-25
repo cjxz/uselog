@@ -4,8 +4,11 @@ import io.appulse.utils.Bytes;
 import lombok.NonNull;
 import lombok.SneakyThrows;
 import org.apache.pulsar.shade.io.airlift.compress.Compressor;
+import org.apache.pulsar.shade.io.airlift.compress.Decompressor;
 import org.apache.pulsar.shade.io.airlift.compress.lz4.Lz4Compressor;
 import org.apache.pulsar.shade.io.airlift.compress.lz4.Lz4Decompressor;
+import org.apache.pulsar.shade.io.airlift.compress.snappy.SnappyCompressor;
+import org.apache.pulsar.shade.io.airlift.compress.snappy.SnappyDecompressor;
 
 import java.io.Closeable;
 import java.nio.ByteBuffer;
@@ -36,7 +39,7 @@ public class FIFOFile implements Closeable {
     private int maxFileSize;
 
     private Compressor compressor;
-    private Lz4Decompressor decompressor;
+    private Decompressor decompressor;
 
     private byte[] compressorBuffer;
 
@@ -62,8 +65,8 @@ public class FIFOFile implements Closeable {
 
         initWriteReadFile();
 
-        compressor = new Lz4Compressor();
-        decompressor = new Lz4Decompressor();
+        compressor = new SnappyCompressor();
+        decompressor = new SnappyDecompressor();
         compressorBuffer = new byte[cacheSize + cacheSize / 255 + 20];
     }
 
