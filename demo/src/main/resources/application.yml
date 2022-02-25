@@ -2,7 +2,7 @@ server:
   port: 8090
 fastlog:
   enable: true
-  url: 10.106.112.30:9092
+  url: 192.168.166.7:9092
   topic: log4
   #url: pulsar://localhost:6650
   #topic: persistent://log/test1/test-topic

@@ -43,8 +43,8 @@ public class LogWorker extends AbstractWorker<Object, EventSlot>
     private final RingBuffer<EventSlot> ringBuffer;
 
     // 统计丢弃的日志数
-    final LogMissingCountAndPrint logMissingCount = new LogMissingCountAndPrint("log");
-    final LogMissingCountAndPrint fileMissingCount = new LogMissingCountAndPrint("file");
+    final LogMissingCountAndPrint logMissingCount = new LogMissingCountAndPrint("log missing count");
+    final LogMissingCountAndPrint fileMissingCount = new LogMissingCountAndPrint("file missing count");
 
     // 消息去向, 二选1
     // 初始时先通过file,file缓冲区为空的切到mq

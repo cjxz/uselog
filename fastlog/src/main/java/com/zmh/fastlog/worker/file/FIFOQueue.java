@@ -229,6 +229,8 @@ class BytesCacheQueue {
             return false;
         }
 
+        System.out.println("log len" + dataLength);
+
         this.bytes.write4B(dataLength); //日志的长度 单位：字节
         this.bytes.write8B(byteData.getId());
         this.bytes.writeNB(byteData.getData(), 0, dataLength);

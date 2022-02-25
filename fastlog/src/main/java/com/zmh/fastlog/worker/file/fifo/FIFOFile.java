@@ -16,8 +16,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
-import static com.zmh.fastlog.utils.Utils.debugLogCondition;
-import static com.zmh.fastlog.utils.Utils.safeClose;
+import static com.zmh.fastlog.utils.Utils.*;
 import static com.zmh.fastlog.worker.file.fifo.ReadWriteFileFactory.createReadFile;
 import static com.zmh.fastlog.worker.file.fifo.ReadWriteFileFactory.createWriteFile;
 import static java.util.Objects.isNull;
@@ -113,12 +112,14 @@ public class FIFOFile implements Closeable {
                 if (writeFile.write(buffer)) {
                     return;
                 }
-
                 if (filesManager.getFileNum() == 1) {
                     readFile = createReadFile(writeFile.getPath(), indexFile, writeFile.getReadIndex(), writeFile.getWriteIndex(), capacity);
                 }
 
                 Path path = filesManager.createNextFile();
+
+                debugLog("new file path" + path.toString());
+
                 if (filesManager.getFileNum() > maxFileSize) {
                     filesManager.remove(filesManager.first());
                     if (nonNull(readFile)) {

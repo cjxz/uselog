@@ -31,7 +31,7 @@ public class MqWorker extends AbstractWorker<ByteData, EventSlot>
     private volatile boolean isDisposed = false;
 
     private final int batchSize;
-    LogMissingCountAndPrint mqCount = new LogMissingCountAndPrint("mq");
+    private LogMissingCountAndPrint mqCount = new LogMissingCountAndPrint("mq send count");
 
 
     public MqWorker(MqProducer mqProducer, int batchSize) {
@@ -72,8 +72,6 @@ public class MqWorker extends AbstractWorker<ByteData, EventSlot>
     // 上次mq成功发送出去的messageId
     private long lastMessageId;
 
-    private LogMissingCountAndPrint logMissingCount = new LogMissingCountAndPrint("mq");
-
     @Override
     public void dequeue(EventSlot event, long sequence, boolean endOfBatch) {
         // 消费的时候，有可能mqProducer还没准备好，此时需要尽可能的等待mqProducer准备好为止
@@ -83,7 +81,7 @@ public class MqWorker extends AbstractWorker<ByteData, EventSlot>
 
         long processMessageId = event.getByteData().getId();
         if (processMessageId == 0L) {
-            logMissingCount.increment();
+            mqCount.increment();
         }
 
         mqProducer.sendEvent(event);
