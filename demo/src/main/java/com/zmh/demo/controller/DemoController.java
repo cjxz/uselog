@@ -56,7 +56,7 @@ public class DemoController {
 
         String[] text = new String[diverse];
         for (int i = 0; i < diverse; i++) {
-            text[i] = getText(100 + i);
+            text[i] = getText(200);
         }
 
         StopWatch stopWatch = new StopWatch();
