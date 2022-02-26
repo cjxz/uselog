@@ -3,7 +3,9 @@
 
     <springProperty scope="context" name="fastlogUrl" source="fastlog.url" defaultValue="localhost:9092"/>
     <springProperty scope="context" name="fastlogTopic" source="fastlog.topic" defaultValue="localhost:9092"/>
-    <springProperty scope="context" name="fastlogAsync" source="fastlog.async" defaultValue="localhost:9092"/>
+    <springProperty scope="context" name="logType" source="fastlog.logType" defaultValue="fastlog"/>
+
+    <property name="LOG_PATH" value="logs/cache/filebeat"/>
 
     <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
         <filter class="com.zmh.demo.filter.StdoutFilter" />
@@ -11,6 +13,33 @@
         <encoder>
             <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{5} - %msg%n</pattern>
         </encoder>
+    </appender>
+
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+            <providers class="net.logstash.logback.composite.loggingevent.LoggingEventJsonProviders">
+                <pattern>
+                    <pattern>
+                        {
+                        "@timestamp":"%d{yyyy-MM-dd HH:mm:ss.SSS}",
+                        "level": "%level",
+                        "thread": "%thread",
+                        "logger": "%logger{40}",
+                        "message": "%message",
+                        "stack_trace":
+                        "%exception{10}"
+                        }
+                    </pattern>
+                </pattern>
+            </providers>
+        </encoder>
+
+        <!--  配置日志文件滚动存储策略 -->
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>${LOG_PATH}/probe.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <MaxHistory>20</MaxHistory>
+            <maxFileSize>1GB</maxFileSize>
+        </rollingPolicy>
     </appender>
 
     <appender name="GITHUB" class="com.github.danielwegener.logback.kafka.KafkaAppender">
@@ -40,7 +69,7 @@
 
     <include resource="fastlog-base.xml" />
 
-    <if condition='property("enable").contains("true")'>
+    <if condition='property("logType").contains("fastlog")'>
         <then>
             <root level="INFO">
                 <appender-ref ref="FAST_LOG" />
@@ -48,23 +77,21 @@
             </root>
         </then>
         <else>
-            <if condition='property("fastlogAsync").contains("true")'>
+            <if condition='property("logType").contains("github")'>
                 <then>
                     <root level="INFO">
-                        <appender-ref ref="ASYNC_GITHUB"/>
+                        <appender-ref ref="ASYNC_GITHUB" />
                         <appender-ref ref="STDOUT"/>
                     </root>
                 </then>
                 <else>
                     <root level="INFO">
-                        <appender-ref ref="GITHUB"/>
+                        <appender-ref ref="FILE"/>
                         <appender-ref ref="STDOUT"/>
                     </root>
                 </else>
             </if>
-
         </else>
     </if>
-
 
 </configuration>

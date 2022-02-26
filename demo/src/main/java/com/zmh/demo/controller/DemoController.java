@@ -36,7 +36,15 @@ public class DemoController {
 
     private final static int permits = 1_0000;
 
-    private final static RateLimiter limiter = RateLimiter.create(permits);
+    private static volatile RateLimiter limiter = RateLimiter.create(permits);
+
+    private static String[] text = new String[100];
+
+    static {
+        for (int i = 0; i < 100; i++) {
+            text[i] = getText1(120);
+        }
+    }
 
     @GetMapping("test")
     public void test() {
@@ -47,15 +55,10 @@ public class DemoController {
         debugLog("end:" + getNowTime());
     }
 
-    @GetMapping("/testLog/{diverse}/{threadCount}/{seconds}/{qps}/{size}")
+    @GetMapping("/testLog/{diverse}/{threadCount}/{seconds}/{qps}")
     @SneakyThrows
-    public void testLog(@PathVariable("size") int size, @PathVariable("diverse") int diverse, @PathVariable("threadCount") int threadCount, @PathVariable("seconds") int seconds, @PathVariable("qps") int qps) {
+    public void testLog(@PathVariable("diverse") int diverse, @PathVariable("threadCount") int threadCount, @PathVariable("seconds") int seconds, @PathVariable("qps") int qps) {
         debugLog("===========================================begin:" + getNowTime());
-
-        String[] text = new String[diverse];
-        for (int i = 0; i < diverse; i++) {
-            text[i] = getText1(size);
-        }
 
         StopWatch stopWatch = new StopWatch();
         stopWatch.start();
@@ -153,7 +156,7 @@ public class DemoController {
 
 
 
-    private String getText1(int size) {
+    private static String getText1(int size) {
         List<String> stringList = getText(size);
         Collections.shuffle(stringList);
 
@@ -164,7 +167,7 @@ public class DemoController {
         return sb.toString();
     }
 
-    private List<String> getText(int size) {
+    private static List<String> getText(int size) {
         List<String> list = new ArrayList<>();
 
         for (int i = 0; i < 10; i++) {
@@ -180,7 +183,7 @@ public class DemoController {
 
     //随机生成常见汉字
     @SneakyThrows
-    private String getRandomChar() {
+    private static String getRandomChar() {
         int highCode;
         int lowCode;
 

@@ -12,3 +12,4 @@ fastlog:
   async: true
   fileMemoryCacheSize: 8
   fileMaxCacheCount: 64
+  logType: fastlog
