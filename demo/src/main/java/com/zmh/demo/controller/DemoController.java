@@ -20,10 +20,10 @@ import java.math.BigDecimal;
 import java.util.*;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.TimeUnit;
 
 import static com.zmh.fastlog.utils.Utils.debugLog;
 import static com.zmh.fastlog.utils.Utils.getNowTime;
+import static java.lang.System.currentTimeMillis;
 import static java.math.RoundingMode.HALF_UP;
 import static java.util.Objects.nonNull;
 import static java.util.concurrent.TimeUnit.SECONDS;
@@ -60,15 +60,16 @@ public class DemoController {
     public void testLog(@PathVariable("diverse") int diverse, @PathVariable("threadCount") int threadCount, @PathVariable("seconds") int seconds, @PathVariable("qps") int qps) {
         debugLog("===========================================begin:" + getNowTime());
 
-        StopWatch stopWatch = new StopWatch();
-        stopWatch.start();
+        long start = currentTimeMillis();
 
         int total = seconds * qps;
         int count = seconds * permits / threadCount;
 
+        List<Thread> list = new ArrayList<>();
+
         CountDownLatch taskLatch = new CountDownLatch(count);
         for (int i = 0; i < threadCount; i++) {
-            threadFactory.newThread(() -> {
+            Thread thread = threadFactory.newThread(() -> {
                 int index = 0;
                 for (int j = 0; j < count; j++) {
                     limiter.acquire();
@@ -77,15 +78,24 @@ public class DemoController {
                     }
                     taskLatch.countDown();
                 }
-            }).start();
+            });
+            list.add(thread);
+            thread.start();
         }
 
         //当前线程阻塞，等待计数器置为0
         taskLatch.await();
 
-        stopWatch.stop();
-        long time = stopWatch.getTime(TimeUnit.MILLISECONDS);
-        debugLog("===========================================耗时：" + time + " " + new BigDecimal( total / 10).divide(new BigDecimal(time), 2, HALF_UP) + "w/QPS");
+        long countDownLatch = currentTimeMillis();
+        long time = countDownLatch - start;
+        debugLog("===========================================应用耗时：" + time + " " + new BigDecimal( total / 10).divide(new BigDecimal(time), 2, HALF_UP) + "w/QPS");
+
+        for (int i = 0; i < list.size(); i++) {
+            list.get(i).join();
+        }
+
+        time = start - currentTimeMillis();
+        debugLog("===========================================实际耗时：" + time + " " + new BigDecimal( total / 10).divide(new BigDecimal(time), 2, HALF_UP) + "w/QPS");
 
         debugLog("===========================================end:" + getNowTime());
     }
