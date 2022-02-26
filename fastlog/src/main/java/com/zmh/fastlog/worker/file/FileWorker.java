@@ -38,7 +38,7 @@ public class FileWorker extends AbstractWorker<ByteData, EventSlot>
             batchSize << 1,
             namedDaemonThreadFactory("log-file-worker"),
             ProducerType.SINGLE,
-            new LiteTimeoutBlockingWaitStrategy(100, MILLISECONDS)
+            new LiteTimeoutBlockingWaitStrategy(10, MILLISECONDS)
         );
         queue.handleEventsWith(this);
         ringBuffer = queue.getRingBuffer();

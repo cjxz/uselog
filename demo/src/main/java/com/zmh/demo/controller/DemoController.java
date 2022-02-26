@@ -66,11 +66,11 @@ public class DemoController {
         CountDownLatch taskLatch = new CountDownLatch(count);
         for (int i = 0; i < threadCount; i++) {
             threadFactory.newThread(() -> {
+                int index = 0;
                 for (int j = 0; j < count; j++) {
                     limiter.acquire();
                     for (int k = 0; k < qps / permits; k++) {
-                        int index = j % diverse;
-                        log.info(text[index]);
+                        log.info(text[index++ % diverse]);
                     }
                     taskLatch.countDown();
                 }
