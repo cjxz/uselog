@@ -44,8 +44,8 @@
 
     <appender name="GITHUB" class="com.github.danielwegener.logback.kafka.KafkaAppender">
 
-        <encoder>
-            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{5} - %msg%n</pattern>
+        <encoder class="ch.qos.logback.core.encoder.LayoutWrappingEncoder">
+            <layout class="com.zmh.fastlog.github.LogbackLayout" />
         </encoder>
 
         <topic>${fastlogTopic}</topic>

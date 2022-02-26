@@ -114,6 +114,7 @@ public class KafkaProducer implements MqProducer {
 
     @SneakyThrows
     private void heartbeat() {
+
         if (isReady) {
             return;
         }
