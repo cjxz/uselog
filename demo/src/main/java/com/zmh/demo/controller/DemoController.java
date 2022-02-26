@@ -18,7 +18,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
 import java.util.*;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadFactory;
 
 import static com.zmh.fastlog.utils.Utils.debugLog;
@@ -67,7 +66,6 @@ public class DemoController {
 
         List<Thread> list = new ArrayList<>();
 
-        CountDownLatch taskLatch = new CountDownLatch(count);
         for (int i = 0; i < threadCount; i++) {
             Thread thread = threadFactory.newThread(() -> {
                 int index = 0;
@@ -76,25 +74,17 @@ public class DemoController {
                     for (int k = 0; k < qps / permits; k++) {
                         log.info(text[index++ % diverse]);
                     }
-                    taskLatch.countDown();
                 }
             });
             list.add(thread);
             thread.start();
         }
 
-        //当前线程阻塞，等待计数器置为0
-        taskLatch.await();
-
-        long countDownLatch = currentTimeMillis();
-        long time = countDownLatch - start;
-        debugLog("===========================================应用耗时：" + time + " " + new BigDecimal( total / 10).divide(new BigDecimal(time), 2, HALF_UP) + "w/QPS");
-
         for (int i = 0; i < list.size(); i++) {
             list.get(i).join();
         }
 
-        time = start - currentTimeMillis();
+        long time =  currentTimeMillis() - start;
         debugLog("===========================================实际耗时：" + time + " " + new BigDecimal( total / 10).divide(new BigDecimal(time), 2, HALF_UP) + "w/QPS");
 
         debugLog("===========================================end:" + getNowTime());

@@ -30,7 +30,7 @@ public class FileWorker extends AbstractWorker<ByteData, EventSlot>
         this.HIGH_WATER_LEVEL_FILE = batchSize;
         queue = new Disruptor<>(
             EventSlot::new,
-            batchSize << 1,
+            batchSize << 2,
             namedDaemonThreadFactory("log-file-worker"),
             ProducerType.SINGLE,
             new LiteTimeoutBlockingWaitStrategy(10, MILLISECONDS)

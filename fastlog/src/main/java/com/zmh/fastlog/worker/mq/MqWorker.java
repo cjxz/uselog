@@ -40,7 +40,7 @@ public class MqWorker extends AbstractWorker<ByteData, EventSlot>
 
         queue = new Disruptor<>(
             EventSlot::new,
-            batchSize << 2,
+            batchSize << 4,
             namedDaemonThreadFactory("log-mq-worker"),
             ProducerType.SINGLE,
             new LiteTimeoutBlockingWaitStrategy(1, SECONDS)
