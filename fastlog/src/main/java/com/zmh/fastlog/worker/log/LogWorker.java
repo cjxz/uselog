@@ -65,7 +65,7 @@ public class LogWorker extends AbstractWorker<Object, EventSlot>
         // 缓冲区设置
         // 初始的缓冲池, 避免短期内日志突然增多造成日志来不及处理而丢失
         // 本实例是日志的入口, 尽量通过缓冲区把各个线程的日志的平缓的收集过来
-        int bufferSize = batchSize << 4;
+        int bufferSize = batchSize << 5;
         this.highWaterLevelFile = (int) (bufferSize * 0.9);
         this.highWaterLevelMq = (int) (bufferSize * 0.8);
 
@@ -97,14 +97,17 @@ public class LogWorker extends AbstractWorker<Object, EventSlot>
             if (isExclude(msg)) {
                 return true;
             }
-            if (!ringBuffer.tryPublishEvent((event, sequence) -> {
+            /*if (!ringBuffer.tryPublishEvent((event, sequence) -> {
                 messageConverter.convertToByteData(msg, event.getByteData(), sequence);
             })) {
                 logMissingCount.increment();
                 return false;
             } else {
                 return true;
-            }
+            }*/
+            ringBuffer.publishEvent((event, sequence) -> {
+                messageConverter.convertToByteData(msg, event.getByteData(), sequence);
+            });
         } else if (message instanceof LastConfirmedSeq) {
             long lastSeq = ((LastConfirmedSeq) message).getSeq();
             // 本地文件缓冲区已经发完了, 后续日志切换到mq

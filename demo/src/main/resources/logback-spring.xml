@@ -63,7 +63,6 @@
     <appender name="ASYNC_GITHUB" class="ch.qos.logback.classic.AsyncAppender">
         <discardingThreshold>0</discardingThreshold>
         <queueSize>32768</queueSize>
-        <neverBlock>true</neverBlock>
         <appender-ref ref="GITHUB"/>
     </appender>
 
