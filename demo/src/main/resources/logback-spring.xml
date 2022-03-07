@@ -55,9 +55,10 @@
                 class="com.github.danielwegener.logback.kafka.delivery.AsynchronousDeliveryStrategy" />
         <!-- 请勿后移该项配置 -->
         <producerConfig>bootstrap.servers=${fastlogUrl}</producerConfig>
-        <producerConfig>max.block.ms=0</producerConfig>
+        <producerConfig>max.block.ms=200</producerConfig>
         <producerConfig>compression.type=lz4</producerConfig>
-        <producerConfig>batch.size=1048576</producerConfig>
+        <producerConfig>batch.size=1000000</producerConfig>
+        <producerConfig>linger.ms=10</producerConfig>
     </appender>
 
     <appender name="ASYNC_GITHUB" class="ch.qos.logback.classic.AsyncAppender">

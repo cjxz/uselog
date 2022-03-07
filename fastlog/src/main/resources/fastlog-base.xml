@@ -11,7 +11,8 @@
     <springProperty scope="context" name="fileMemoryCacheSize" source="fastlog.fileMemoryCacheSize" defaultValue="64"/>
     <springProperty scope="context" name="maxFileCount" source="fastlog.maxFileCount" defaultValue="20"/>
     <springProperty scope="context" name="maxMsgSize" source="fastlog.maxMsgSize" defaultValue="10240"/>
-    <springProperty scope="context" name="fileMaxCacheCount" source="fastlog.fileMaxCacheCount" defaultValue="16"/>
+    <springProperty scope="context" name="fileCapacity" source="fastlog.fileCapacity" defaultValue="1024"/>
+    <springProperty scope="context" name="fileCompressType" source="fastlog.fileCompressType" defaultValue="lz4"/>
 
 
     <appender name="FAST_LOG" class="com.zmh.fastlog.FastLogAppender">
@@ -26,7 +27,8 @@
             <fileMemoryCacheSize>${fileMemoryCacheSize}</fileMemoryCacheSize>
             <maxFileCount>${maxFileCount}</maxFileCount>
             <maxMsgSize>${maxMsgSize}</maxMsgSize>
-            <fileMaxCacheCount>${fileMaxCacheCount}</fileMaxCacheCount>
+            <fileCapacity>${fileCapacity}</fileCapacity>
+            <fileCompressType>${fileCompressType}</fileCompressType>
         </config>
     </appender>
 

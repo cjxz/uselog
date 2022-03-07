@@ -48,7 +48,7 @@ public class FIFOFile implements Closeable {
     private final ExecutorService singleThreadExecutor = Executors.newSingleThreadExecutor();
 
     @SneakyThrows
-    public FIFOFile(@NonNull String folder, int cacheSize, long capacity, int maxFileSize) {
+    public FIFOFile(@NonNull String folder, int cacheSize, long capacity, int maxFileSize, String compressType) {
         Path path = Paths.get(folder);
 
         if (!Files.exists(path)) {
@@ -67,8 +67,17 @@ public class FIFOFile implements Closeable {
 
         initWriteReadFile();
 
-        compressor = new Lz4Compressor();
-        decompressor = new Lz4Decompressor();
+        if ("snappy".equals(compressType)) {
+            compressor = new SnappyCompressor();
+            decompressor = new SnappyDecompressor();
+        } else if ("zstd".equals(compressType)) {
+            compressor = new ZstdCompressor();
+            decompressor = new ZstdDecompressor();
+        } else {
+            compressor = new Lz4Compressor();
+            decompressor = new Lz4Decompressor();
+        }
+
         compressorBuffer = new byte[cacheSize + cacheSize / 255 + 20];
     }
 

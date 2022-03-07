@@ -37,14 +37,21 @@ public class FIFOQueue implements AutoCloseable {
     private final BytesCacheQueueFlush head;
 
     @SneakyThrows
-    public FIFOQueue(String folder, int cacheSize, int fileMaxCacheCount, int maxFileCount) { //todo zmh
-        if (Integer.bitCount(fileMaxCacheCount) != 1) {
-            throw new IllegalArgumentException("fileMaxCacheCount must be a power of 2");
+    public FIFOQueue(String folder, int cacheSize, long capacity, int maxFileCount, String compressType) {
+        if (Integer.bitCount(cacheSize) != 1) {
+            throw new IllegalArgumentException("cacheSize must be a power of 2");
         }
 
-        int sizeInByte = cacheSize * 1024 * 1024;
-        long capacity = (long) sizeInByte * (long) fileMaxCacheCount;
-        logFiles = new FIFOFile(folder, sizeInByte, capacity, maxFileCount);
+        if (Long.bitCount(capacity) != 1) {
+            throw new IllegalArgumentException("capacity must be a power of 2");
+        }
+
+        if (cacheSize > capacity) {
+            throw new IllegalArgumentException("capacity must bigger than cacheSize");
+        }
+
+        int sizeInByte = cacheSize << 20;
+        logFiles = new FIFOFile(folder, sizeInByte, capacity << 20, maxFileCount, compressType);
 
         /*logFiles = LogFilesManager.builder()
             .cacheSize(sizeInByte)

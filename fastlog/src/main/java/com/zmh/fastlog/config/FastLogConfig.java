@@ -42,22 +42,23 @@ public class FastLogConfig {
 
     /**
      * 存入磁盘文件的内存缓存区大小，实际开的内存缓存区大小是这个数值的3倍
-     * 单位：字节
-     * 默认：64 * 1024 * 1024 即 64MB
+     * 单位：MB
+     * 默认：64MB
      */
     private int fileMemoryCacheSize;
 
     /**
-     * 一个日志磁盘文件中最多能存放多少个缓存块，必须为2的幂数
-     * 默认：16
+     * 一个日志磁盘最大文件大小
+     * 单位：MB
+     * 默认：1024MB
      */
-    private int fileMaxCacheCount;
+    private long fileCapacity;
 
     /**
-     * 最多能有多少个日志文件，每个日志文件的大小是fileMemoryCacheSize * fileMaxCacheCount的大小，也就是磁盘最多能占用maxFileCount * fileMemoryCacheSize * fileMaxCacheCount的大小，
+     * 最多能有多少个日志文件，也就是磁盘最多能占用maxFileCount * fileCapacity的大小，
      * 超过这个数量，则删除最老的日志文件
      * <p>
-     * 默认：20 （也就是默认磁盘最多占用 20 * 64 * 16MB = 20GB）
+     * 默认：20 （也就是默认磁盘最多占用20GB）
      * <p>
      * 假设mq挂了，日志的平均收集速度是1w/QPS，每条日志的大小是256字节，那么磁盘占满需要 20GB / (256 * 1w) ≈ 8192s = 2.28h
      */
@@ -69,6 +70,13 @@ public class FastLogConfig {
      * 默认：10240
      */
     private int maxMsgSize;
+
+    /**
+     * 文件压缩类型
+     * lz4,snappy,zstd
+     * 默认：lz4
+     */
+    private String fileCompressType;
 
     /**
      * Kafka的batchsize单位是字节

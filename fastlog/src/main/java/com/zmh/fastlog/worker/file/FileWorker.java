@@ -3,6 +3,7 @@ package com.zmh.fastlog.worker.file;
 import com.lmax.disruptor.*;
 import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
+import com.zmh.fastlog.config.FastLogConfig;
 import com.zmh.fastlog.model.event.EventSlot;
 import com.zmh.fastlog.model.message.ByteData;
 import com.zmh.fastlog.worker.AbstractWorker;
@@ -23,8 +24,9 @@ public class FileWorker extends AbstractWorker<ByteData, EventSlot>
 
     private volatile boolean isClose;
 
-    public FileWorker(MqWorker mqWorker, int batchSize, int cacheSize, int fileMaxCacheCount, int maxFileCount, String folder) {
-        fifo = new FIFOQueue(folder, cacheSize, fileMaxCacheCount, maxFileCount);
+    public FileWorker(MqWorker mqWorker, FastLogConfig config) {
+        int batchSize = config.getFileMemoryCacheSize();
+        fifo = new FIFOQueue(config.getFileCacheFolder(), batchSize, config.getFileCapacity(), config.getMaxFileCount(), config.getFileCompressType());
 
         this.mqWorker = mqWorker;
         this.HIGH_WATER_LEVEL_FILE = batchSize;
@@ -42,7 +44,8 @@ public class FileWorker extends AbstractWorker<ByteData, EventSlot>
 
     @Override
     public boolean enqueue(ByteData byteData) {
-        return ringBuffer.tryPublishEvent((e, s) -> byteData.switchData(e.getByteData()));
+        ringBuffer.publishEvent((e, s) -> byteData.switchData(e.getByteData()));
+        return true;
     }
 
     @Override

@@ -16,6 +16,7 @@ import java.io.Closeable;
 import java.util.HashMap;
 import java.util.Map;
 
+import static com.zmh.fastlog.utils.Utils.safeClose;
 import static java.util.Objects.isNull;
 import static java.util.Objects.nonNull;
 import static org.apache.commons.lang3.StringUtils.isNotBlank;
@@ -96,7 +97,7 @@ class FastLog implements Closeable {
                 producer = new KafkaProducer(config.getUrl(), config.getTopic(), config.getBatchSize());
             }
             mqWorker = new MqWorker(producer, config.getBatchMessageSize());
-            fileWorker = new FileWorker(mqWorker, config.getBatchMessageSize(), config.getFileMemoryCacheSize(), config.getFileMaxCacheCount(), config.getMaxFileCount(), config.getFileCacheFolder());
+            fileWorker = new FileWorker(mqWorker, config);
             logWorker = new LogWorker(mqWorker, fileWorker, config.getBatchMessageSize(), config.getMaxMsgSize());
         } catch (Exception ex) {
             this.close();
@@ -110,9 +111,9 @@ class FastLog implements Closeable {
 
     @Override
     public void close() {
-        mqWorker.close();
-        logWorker.close();
-        fileWorker.close();
+        safeClose(mqWorker);
+        safeClose(logWorker);
+        safeClose(fileWorker);
     }
 }
 

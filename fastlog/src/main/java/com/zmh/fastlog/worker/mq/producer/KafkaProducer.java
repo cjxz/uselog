@@ -57,6 +57,7 @@ public class KafkaProducer implements MqProducer {
         configs.put("compression.type", "lz4");//字符串，默认值none。Producer用于压缩数据的压缩类型，取值：none, gzip, snappy, or lz4
         configs.put("batch.size", batchSize);
         configs.put("max.block.ms", 200);//long，默认值60000。控制block的时长，当buffer空间不够或者metadata丢失时产生block
+        configs.put("linger.ms", 10);
         //configs.put("buffer.memory", );// long, 默认值33554432。 Producer可以用来缓存数据的内存大小
 
         try {
@@ -120,9 +121,9 @@ public class KafkaProducer implements MqProducer {
         }
         // todo zmh serial
         ProducerRecord<String, ByteBuffer> record = new ProducerRecord<>(topic, ByteBuffer.wrap("heartbeat".getBytes()));
-        Future<RecordMetadata> future = producer.send(record);
 
         try {
+            Future<RecordMetadata> future = producer.send(record);
             if (nonNull(future.get())) {
                 this.isReady = true;
             }

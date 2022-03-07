@@ -90,30 +90,6 @@ public class DemoController {
         debugLog("===========================================end:" + getNowTime());
     }
 
-    @GetMapping("/disk/{size}/{total}")
-    @SneakyThrows
-    public void testDisk(@PathVariable("size") int size, @PathVariable("total") int total) {
-        try (FIFOQueue fifo = new FIFOQueue("logs/cache", size, 8, 100)) {
-            long seq = 1L;
-
-            byte[] bytes = getText1(300).getBytes();
-            ByteData byteEvent = new ByteData(0, bytes, bytes.length);
-
-            StopWatch watch = new StopWatch();
-            watch.start();
-            for (int i = 0; i < total; i++) {
-                for (int j = 0; j < 10000; j++) {
-                    byteEvent.setId(seq++);
-                    fifo.put(byteEvent);
-                }
-            }
-            watch.stop();
-            debugLog("一共创建了" + fifo.getTotalFile() + "个文件，还剩余" + fifo.getFileNum() + "个文件");
-            debugLog(watch.formatTime());
-            debugLog(total / watch.getTime(SECONDS) + "w/QPS");
-        }
-    }
-
     @GetMapping("/testKafka")
     public void testKafka() {
         Map<String, Object> configs = new HashMap<>();
