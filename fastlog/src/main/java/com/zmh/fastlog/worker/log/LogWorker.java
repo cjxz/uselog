@@ -97,14 +97,6 @@ public class LogWorker extends AbstractWorker<Object, EventSlot>
             if (isExclude(msg)) {
                 return true;
             }
-            /*if (!ringBuffer.tryPublishEvent((event, sequence) -> {
-                messageConverter.convertToByteData(msg, event.getByteData(), sequence);
-            })) {
-                logMissingCount.increment();
-                return false;
-            } else {
-                return true;
-            }*/
             ringBuffer.publishEvent((event, sequence) -> {
                 messageConverter.convertToByteData(msg, event.getByteData(), sequence);
             });
@@ -131,8 +123,8 @@ public class LogWorker extends AbstractWorker<Object, EventSlot>
         ByteData byteData = event.getByteData();
         byteData.setId(messageId);
 
-        boolean success = false;
         if (directWriteToMq) {
+            boolean success;
             while (!(success = mqWorker.enqueue(byteData))) {
                 if (isClosed) {
                     break;
@@ -150,22 +142,10 @@ public class LogWorker extends AbstractWorker<Object, EventSlot>
         }
 
         if (!directWriteToMq) {
-            while (!(success = fileWorker.enqueue(byteData))) {
-                if (isClosed) {
-                    break;
-                }
-                if (ringBuffer.getCursor() - sequence >= highWaterLevelFile) {
-                    break;
-                }
-                ThreadUtils.sleep(5);
-            }
+            fileWorker.enqueue(byteData);
         }
 
-        if (success) {
-            lastMessageId = messageId;
-        } else {
-            fileMissingCount.increment();
-        }
+        lastMessageId = messageId;
 
         // clear必须在notify之前，否则notify之后，新的数据可能立马放入event中，后执行clear可能会把新的数据给clear掉
         event.clear();

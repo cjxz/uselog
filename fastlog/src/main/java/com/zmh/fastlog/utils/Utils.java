@@ -67,7 +67,7 @@ public class Utils {
     public static String getPrintText(int size) {
         StringBuilder sb = new StringBuilder();
 
-        for (int j = 0; j < size / 10 - 10; j++) {
+        for (int j = 0; j < size; j++) {
             sb.append(RandomStringUtils.randomPrint(1));
         }
 
@@ -77,13 +77,11 @@ public class Utils {
     private static List<String> getText1(int size) {
         List<String> list = new ArrayList<>();
 
-        for (int i = 0; i < 10; i++) {
-            for (int j = 0; j < size / 10 - 10; j++) {
-                list.add(RandomStringUtils.randomPrint(1));
-            }
-            for (int j = 0; j < 10; j++) {
-                list.add(getRandomChar());
-            }
+        for (int j = 0; j < size / 5; j++) {
+            list.add(RandomStringUtils.randomPrint(1));
+        }
+        for (int j = 0; j < size - size / 5; j++) {
+            list.add(getRandomChar());
         }
         return list;
     }

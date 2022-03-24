@@ -82,7 +82,6 @@ public class MqWorker extends AbstractWorker<ByteData, EventSlot>
         long processMessageId = event.getByteData().getId();
 
         mqProducer.sendEvent(event);
-        mqCount.increment();
 
         if (++batchIndex >= batchSize || endOfBatch) {
             mqProducer.flush();
