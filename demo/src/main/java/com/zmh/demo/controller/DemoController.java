@@ -1,14 +1,11 @@
 package com.zmh.demo.controller;
 
 import com.google.common.util.concurrent.RateLimiter;
-import com.zmh.fastlog.model.message.ByteData;
 import com.zmh.fastlog.utils.ThreadUtils;
-import com.zmh.fastlog.worker.file.FIFOQueue;
+import com.zmh.fastlog.utils.Utils;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.RandomStringUtils;
 import org.apache.commons.lang3.time.DateFormatUtils;
-import org.apache.commons.lang3.time.StopWatch;
 import org.apache.kafka.clients.producer.KafkaProducer;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.kafka.common.serialization.StringSerializer;
@@ -25,7 +22,6 @@ import static com.zmh.fastlog.utils.Utils.getNowTime;
 import static java.lang.System.currentTimeMillis;
 import static java.math.RoundingMode.HALF_UP;
 import static java.util.Objects.nonNull;
-import static java.util.concurrent.TimeUnit.SECONDS;
 
 @RestController
 @Slf4j
@@ -41,7 +37,7 @@ public class DemoController {
 
     static {
         for (int i = 0; i < 100; i++) {
-            text[i] = getText1(120);
+            text[i] = Utils.getText(120);
         }
     }
 
@@ -49,7 +45,7 @@ public class DemoController {
     public void test() {
         debugLog("begin:" + getNowTime());
         for (int i = 10; i > 0; i--) {
-            log.info(getText1(i));
+            log.info(Utils.getText(i));
         }
         debugLog("end:" + getNowTime());
     }
@@ -100,7 +96,7 @@ public class DemoController {
 
         KafkaProducer<String, String> producer = new KafkaProducer<>(configs, new StringSerializer(), new StringSerializer());
 
-        String text = getText1(1);
+        String text = Utils.getText(1);
         debugLog("begin:" + DateFormatUtils.format(new Date(), "yyyy-MM-dd HH:mm:ss SSS"));
         for (int i = 0; i < 100_0000; i++) {
             ProducerRecord<String, String> record = new ProducerRecord<>("log2", text + i);
@@ -128,50 +124,6 @@ public class DemoController {
                 debugLog(logIndex + ":" + DateFormatUtils.format(new Date(), "yyyy-MM-dd HH:mm:ss SSS"));
             }
         }
-    }
-
-
-
-    private static String getText1(int size) {
-        List<String> stringList = getText(size);
-        Collections.shuffle(stringList);
-
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < stringList.size(); i++) {
-            sb.append(stringList.get(i));
-        }
-        return sb.toString();
-    }
-
-    private static List<String> getText(int size) {
-        List<String> list = new ArrayList<>();
-
-        for (int i = 0; i < 10; i++) {
-            for (int j = 0; j < size / 10 - 10; j++) {
-                list.add(RandomStringUtils.randomPrint(1));
-            }
-            for (int j = 0; j < 10; j++) {
-                list.add(getRandomChar());
-            }
-        }
-        return list;
-    }
-
-    //随机生成常见汉字
-    @SneakyThrows
-    private static String getRandomChar() {
-        int highCode;
-        int lowCode;
-
-        Random random = new Random();
-
-        highCode = (176 + Math.abs(random.nextInt(39))); //B0 + 0~39(16~55) 一级汉字所占区
-        lowCode = (161 + Math.abs(random.nextInt(93))); //A1 + 0~93 每区有94个汉字
-
-        byte[] b = new byte[2];
-        b[0] = (Integer.valueOf(highCode)).byteValue();
-        b[1] = (Integer.valueOf(lowCode)).byteValue();
-        return new String(b, "GBK");
     }
 
 }

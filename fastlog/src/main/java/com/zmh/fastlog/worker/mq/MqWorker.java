@@ -80,9 +80,6 @@ public class MqWorker extends AbstractWorker<ByteData, EventSlot>
         }
 
         long processMessageId = event.getByteData().getId();
-        if (processMessageId == 0L) {
-            mqCount.increment();
-        }
 
         mqProducer.sendEvent(event);
         mqCount.increment();

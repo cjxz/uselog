@@ -84,16 +84,16 @@ public class MessageConverter {
     }
 
     @SuppressWarnings("unused")
-    static class Consts {
-        static final String DATA_MESSAGE = "message";
-        static final String DATA_LOGGER = "logger";
-        static final String DATA_THREAD = "thread";
-        static final String DATA_LEVEL = "level";
-        static final String DATA_MARKER = "marker"; //todo
-        static final String DATA_CALLER = "caller"; //todo
-        static final String DATA_SEQ = "seq";
-        static final String DATA_THROWABLE = "throwable";
-        static final String DATA_TIME_MILLSECOND = "ts";
-        static final String DATA_TIMESTAMP = "@timestamp";
+    public static class Consts {
+        public static final String DATA_MESSAGE = "message";
+        public static final String DATA_LOGGER = "logger";
+        public static final String DATA_THREAD = "thread";
+        public static final String DATA_LEVEL = "level";
+        public static final String DATA_MARKER = "marker"; //todo
+        public static final String DATA_CALLER = "caller"; //todo
+        public static final String DATA_SEQ = "seq";
+        public static final String DATA_THROWABLE = "throwable";
+        public static final String DATA_TIME_MILLSECOND = "ts";
+        public static final String DATA_TIMESTAMP = "@timestamp";
     }
 }
